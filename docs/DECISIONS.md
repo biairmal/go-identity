@@ -21,3 +21,5 @@ Choices made where the TRD was silent or unclear. One line each: `date · task �
 | 2026-10-22 | T0.4 | `listquery` rejects unknown query keys; endpoints list extra keys in `AllowedParams` | The plan wants an unknown filter to be a 400; the ported parser silently ignored it |
 | 2026-10-22 | T0.4 | `listquery` takes `*ListParseConfig` | The added field makes the struct large enough for the `hugeParam` lint |
 | 2026-10-22 | T0.4 | A missing or malformed tenant claim is a 401 in `scope.Tenant` | Without a tenant the caller is not authenticated for tenant data; 500 would hide misconfigured tokens |
+| 2026-10-22 | T0.5 | One `apierr.New(reason)` with a reason → code table instead of per-status helpers | A reason can never be paired with the wrong status; the table test pins TRD 9.2 |
+| 2026-10-22 | T0.5 | `httpx.Handle` wraps go-sdk `handler.Handle` | go-sdk's adapter has no hook for response headers; `Retry-After` comes from `meta.retry_after` |

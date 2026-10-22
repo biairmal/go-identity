@@ -129,3 +129,30 @@ is never accepted as a filter or sort field even if listed.
 
 Repositories get the tenant from `scope.Tenant(ctx)` (the token's `tid` claim) for every read and write, and
 put it in the `WHERE`. A context without a tenant is a 401, never an unscoped query.
+
+## Handlers and errors
+
+Mount every route through `httpx.Handle` (go-sdk `handler.Handle` plus `Retry-After`). Decode bodies with
+`httpx.DecodeJSON` (1 MiB, unknown fields rejected). Return errors from `apierr`, never a hand-made status or a
+custom `code`:
+
+```go
+mux.Handle("PATCH /v1/admin/roles/{id}", httpx.Handle(h.updateRole))
+
+func (h *Handler) updateRole(r *http.Request) (any, error) {
+    var in UpdateRoleRequest
+    if err := httpx.DecodeJSON(r, &in); err != nil {
+        return nil, err
+    }
+    version, err := httpx.Version(r, in.Version) // If-Match: "3", or body version; neither → 428
+    if err != nil {
+        return nil, err
+    }
+    return h.svc.Update(r.Context(), id, version, in)
+}
+
+// in the service or repository
+return apierr.New(apierr.ReasonSystemRole)                                   // 403, meta.reason SYSTEM_ROLE
+return apierr.WithFields(apierr.ReasonPasswordPolicy, map[string]string{"password": "too common"})
+return apierr.WithRetryAfter(apierr.ReasonRateLimited, 30*time.Second)       // 429 + Retry-After: 30
+```
