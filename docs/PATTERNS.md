@@ -93,3 +93,39 @@ err := database.WithTx(ctx, s.db, func(ctx context.Context) error {
 ```
 
 Senders must tolerate duplicates: a crash between sending and recording the send resends.
+
+## List queries
+
+Each list endpoint declares its allow-list once, in the service. The handler parses (a fast 400), the service
+validates the same allow-list again (so non-HTTP callers are held to it), and `ToListOptions` converts:
+
+```go
+// service.go
+var listUsers = listquery.ListParseConfig{
+    AllowedSortFields:   []string{"display_name", "created_at"},
+    AllowedFilterFields: []string{"status", "role"},
+    AllowedParams:       []string{"search"},
+}
+
+// handler.go
+params, err := listquery.ParseListParams(r.URL.Query(), &listUsers)
+
+// service.go
+if err := listquery.ValidateListParams(params, &listUsers); err != nil {
+    return nil, err
+}
+opts := listquery.ToListOptions(params)
+tenant, err := scope.TenantFilter(ctx)
+if err != nil {
+    return nil, err
+}
+opts.Filter.Conditions = append(opts.Filter.Conditions, tenant)
+```
+
+Any query key that is not `page`, `size`, `sort`, an allowed filter or an allowed param is a 400, and `tenant_id`
+is never accepted as a filter or sort field even if listed.
+
+## Tenant scope
+
+Repositories get the tenant from `scope.Tenant(ctx)` (the token's `tid` claim) for every read and write, and
+put it in the `WHERE`. A context without a tenant is a 401, never an unscoped query.
