@@ -1,0 +1,15 @@
+# Binaries and build output
+*.exe
+*.test
+bin/
+out/
+*.out
+
+# Local env (copy from .env.example)
+.env
+
+# Local Go workspace used to develop against an unreleased go-sdk
+go.work
+go.work.sum
+
+.DS_Store
