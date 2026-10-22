@@ -22,8 +22,8 @@ import (
 	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 
-	// Registers the pgx driver under the name sqlkit opens.
-	_ "github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/migrations"
 )
 
 // App is a built service, ready to serve.
@@ -62,7 +62,15 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 	}
 	a.db = db
 
-	deps := Deps{DB: db, Log: log, V: validator.New(cfg.Validator), Authz: authz.NewNoOp()}
+	if err := checkSchema(ctx, db); err != nil {
+		a.close(ctx)
+		return nil, err
+	}
+
+	deps := Deps{
+		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: authz.NewNoOp(),
+		Outbox: database.NewOutbox(db),
+	}
 	modules, err := buildModules(&a.cfg, deps)
 	if err != nil {
 		a.close(ctx)
@@ -174,4 +182,14 @@ func (a *App) close(ctx context.Context) {
 			a.log.Error("database close", logger.F("error", err.Error()))
 		}
 	}
+}
+
+// checkSchema refuses to start when the database is behind the newest
+// embedded migration.
+func checkSchema(ctx context.Context, db *sqlkit.DB) error {
+	m, err := database.NewMigrator(db.Leader(), migrations.FS)
+	if err != nil {
+		return err
+	}
+	return m.EnsureCurrent(ctx)
 }

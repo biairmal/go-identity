@@ -1,4 +1,5 @@
-# Local development stack: Postgres only.
+# Local development stack: Postgres only. On first start it runs
+# deploy/sql/bootstrap.sql, which creates the identity schema and role.
 name: go-identity
 
 services:
@@ -6,14 +7,17 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: app
-      POSTGRES_USER: identity
-      POSTGRES_PASSWORD: identity
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      IDENTITY_DB_PASSWORD: ${DB_PASSWORD:-identity}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      - ../sql:/bootstrap:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U identity -d app"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 2s
       timeout: 3s
       retries: 30

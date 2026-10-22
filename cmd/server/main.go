@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
+
+	"github.com/biairmal/go-sdk/lib/logger"
 
 	"github.com/biairmal/go-identity/internal/app"
 )
@@ -29,6 +29,9 @@ func run(args []string) error {
 	if len(args) > 0 {
 		cmd, args = args[0], args[1:]
 	}
+	if cmd == "migrate" && len(args) > 0 && args[0] == "create" {
+		return migrateCreate(args[1:]) // needs no config or database
+	}
 	cfg, err := app.LoadConfig(envFile, configFile)
 	if err != nil {
 		return err
@@ -44,18 +47,15 @@ func run(args []string) error {
 		}
 		return a.Serve(ctx)
 	case "worker":
-		return runWorker(ctx)
+		return app.RunWorker(ctx, &cfg, log)
 	case "migrate":
-		return fmt.Errorf("migrate %v: not implemented", args)
+		return migrate(ctx, &cfg, log, args)
 	default:
 		return fmt.Errorf("unknown command %q (want serve, worker or migrate)", cmd)
 	}
 }
 
-// runWorker blocks until SIGINT or SIGTERM. Background jobs attach here.
-func runWorker(ctx context.Context) error {
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	<-ctx.Done()
-	return nil
+// logResult is the shape shared by every migrate output line.
+func logResult(log logger.Logger, msg string, version int64, path string) {
+	log.Info(msg, logger.F("version", version), logger.F("file", path))
 }
