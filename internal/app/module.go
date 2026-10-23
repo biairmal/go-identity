@@ -9,6 +9,7 @@ import (
 	"github.com/biairmal/go-identity/internal/module/audit"
 	identityauth "github.com/biairmal/go-identity/internal/module/auth"
 	"github.com/biairmal/go-identity/internal/module/rbac"
+	"github.com/biairmal/go-identity/internal/module/session"
 	"github.com/biairmal/go-identity/internal/module/tenant"
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
@@ -36,9 +37,10 @@ type Module interface {
 // steps that span modules: ensuring the default tenant now, and later seeding
 // roles and the super admin.
 type services struct {
-	tenant *tenant.Service
-	rbac   *rbac.Service
-	auth   *identityauth.Module
+	tenant  *tenant.Service
+	rbac    *rbac.Service
+	auth    *identityauth.Module
+	session *session.Service
 }
 
 // buildModules constructs every module and returns them together with the
@@ -71,10 +73,17 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 		return nil, nil, err
 	}
 
-	modules := []Module{auditModule, tenantModule, rbacModule, authModule}
+	sessionModule := session.New(cfg.Modules.Session, session.Deps{
+		DB:    deps.DB,
+		Log:   deps.Log,
+		Clock: clock.System{},
+	})
+
+	modules := []Module{auditModule, tenantModule, rbacModule, authModule, sessionModule}
 	return modules, &services{
-		tenant: tenantModule.Service(),
-		rbac:   rbacModule.Service(),
-		auth:   authModule,
+		tenant:  tenantModule.Service(),
+		rbac:    rbacModule.Service(),
+		auth:    authModule,
+		session: sessionModule.Service(),
 	}, nil
 }
