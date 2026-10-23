@@ -33,9 +33,4 @@ curl localhost:8080/readyz
 | `GET /version` | Build version |
 | `GET /metrics` | Prometheus, when enabled |
 
-## Developing against an unreleased go-sdk
-
-`go.mod` has `replace github.com/biairmal/go-sdk => ../go-sdk` until the go-sdk release with `authz` is tagged.
-Clone go-sdk next to this repo.
-
 See [AGENTS.md](AGENTS.md) for the rules every change follows.

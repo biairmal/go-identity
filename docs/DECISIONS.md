@@ -28,3 +28,4 @@ Choices made where the TRD was silent or unclear. One line each: `date Â· task Â
 | 2026-10-23 | T0.7 | `internal/` holds `app`, `platform` and `module/<name>`; `platform` keeps its name; no per-audience packages (`admin`, `me`) | A module owns its routes for every audience through `httpx.Routes`, so a feature stays in one package tree |
 | 2026-10-23 | T0.7 | An architecture test (`internal/app/arch_test.go`, via `go list`) replaces the depguard module rule | depguard cannot say "any module except its own" in one rule |
 | 2026-10-23 | T0.7 | `Register` takes `*httpx.Routes` (TRD 3.5 shows a value) | Five routers make the struct large enough for the `hugeParam` lint, as with `*ListParseConfig` |
+| 2026-10-23 | T1.4 | go-identity requires go-sdk `v0.2.0`; the `../go-sdk` replace is gone | go-sdk v0.2.0 ships `authz` |
