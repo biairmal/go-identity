@@ -4,20 +4,36 @@ Copy-paste examples for the rules in [AGENTS.md](../AGENTS.md).
 
 ## Adding a module
 
-1. Create `internal/<module>/` with `module.go`, `config.go`, `model.go`, `dto.go`, `repository.go`,
-   `service.go`, `handler.go`.
+1. Create `internal/module/<name>/` with `module.go`, `config.go`, `model.go`, `dto.go`, `repository.go`,
+   `service.go`, `handler.go`. Helpers only this module uses are its subpackages (`module/auth/password`).
 2. `module.go` exposes `New(cfg Config, deps app-provided values) (*Module, error)` and
-   `Register(r chi.Router)`.
+   `Register(rt *httpx.Routes)`.
 3. Add the module's config block to `app.Config` and one row to `Config.sections()` in
    `internal/app/config.go`.
 4. Add one line to `buildModules` in `internal/app/module.go`.
 
-## Talking to another module
+## Registering routes
 
-Never import it. Declare the port where it is used and wire an adapter in `internal/app`:
+A module mounts into the groups `internal/app/routes.go` built; it never calls `r.Route("/v1/...")` itself.
+Self-service routes go under `rt.Me` (the target is the caller), admin routes under `rt.Admin` with a permission on
+every route:
 
 ```go
-// internal/user/ports.go
+func (m *Module) Register(rt *httpx.Routes) {
+    rt.Me.Get("/sessions", httpx.Handle(m.h.listMine))
+    rt.Me.Delete("/sessions/{id}", httpx.Handle(m.h.revokeMine))
+    rt.Admin.With(middleware.RequirePermission(m.az, "users:write")).
+        Post("/users/{id}/revoke-sessions", httpx.Handle(m.h.revokeForUser))
+}
+```
+
+## Talking to another module
+
+Never import it (the architecture test in `internal/app/arch_test.go` fails `make test`). Declare the port where it
+is used and wire an adapter in `internal/app`:
+
+```go
+// internal/module/user/ports.go
 type TenantLookup interface {
     DefaultTenantID(ctx context.Context) (uuid.UUID, error)
 }

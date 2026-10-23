@@ -2,11 +2,11 @@ package app
 
 import (
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/httpx"
 	"github.com/biairmal/go-sdk/lib/authz"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/validator"
-	"github.com/go-chi/chi/v5"
 )
 
 // Deps are the shared dependencies handed to every module's New.
@@ -23,7 +23,7 @@ type Deps struct {
 // other; when one needs another's data it declares a port and app wires an
 // adapter.
 type Module interface {
-	Register(r chi.Router)
+	Register(rt *httpx.Routes)
 }
 
 // buildModules constructs every module. Adding a module adds one entry here.

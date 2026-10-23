@@ -25,3 +25,6 @@ Choices made where the TRD was silent or unclear. One line each: `date Â· task Â
 | 2026-10-22 | T0.5 | `httpx.Handle` wraps go-sdk `handler.Handle` | go-sdk's adapter has no hook for response headers; `Retry-After` comes from `meta.retry_after` |
 | 2026-10-23 | T0.6 | chi v5 router instead of `http.ServeMux` | Same as guest-management-be; route groups with their own middleware, and `chi.Walk` for route-list tests |
 | 2026-10-23 | T0.6 | 405 envelope uses code `ERR_METHOD_NOT_ALLOWED`, written with an explicit status | errorz has no 405 code; the status is set directly, so the custom code never maps to 500 |
+| 2026-10-23 | T0.7 | `internal/` holds `app`, `platform` and `module/<name>`; `platform` keeps its name; no per-audience packages (`admin`, `me`) | A module owns its routes for every audience through `httpx.Routes`, so a feature stays in one package tree |
+| 2026-10-23 | T0.7 | An architecture test (`internal/app/arch_test.go`, via `go list`) replaces the depguard module rule | depguard cannot say "any module except its own" in one rule |
+| 2026-10-23 | T0.7 | `Register` takes `*httpx.Routes` (TRD 3.5 shows a value) | Five routers make the struct large enough for the `hugeParam` lint, as with `*ListParseConfig` |
