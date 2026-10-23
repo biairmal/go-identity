@@ -1,0 +1,69 @@
+# Defaults for every environment. Values that differ per environment are
+# written as ${ENV_VAR:default}; .env (local) or Secrets/ConfigMaps (clusters)
+# feed the same keys. Secrets never live in this file.
+
+service:
+  name: ${SERVICE_NAME:go-identity}
+  version: ${SERVICE_VERSION:dev}             # set by CI from the git tag
+  environment: ${APP_ENV:local}               # local | staging | production
+
+http:
+  addr: ${HTTP_ADDR::8080}
+  read_header_timeout: 10s
+  max_body_bytes: 1048576                     # 1 MiB request limit
+  cors:
+    allowed_origins: [${CORS_ORIGINS:http://localhost:3000}]
+
+log:                                          # logger.Options
+  level: ${LOG_LEVEL:info}
+  format: ${LOG_FORMAT:json}                  # json | text
+  output: stdout
+
+database:                                     # sqlkit.Config
+  leader:
+    driver: postgres
+    host: ${DB_HOST:localhost}
+    port: ${DB_PORT:5432}
+    database: ${DB_NAME:app}
+    username: ${DB_USER:identity}
+    password: ${DB_PASSWORD:identity}
+    ssl_mode: ${DB_SSLMODE:disable}
+    max_retries: 3
+  followers: []
+  pool: { max_open_conns: 25, max_idle_conns: 5, conn_max_lifetime: 5m }
+  health: { enabled: true, check_interval: 10s, timeout: 2s }
+
+auth:                                         # enabled + auth.Config
+  enabled: ${AUTH_ENABLED:false}
+  mode: local
+  default_protected: true
+  rules:
+    - { pattern: /healthz, public: true }
+    - { pattern: /readyz, public: true }
+    - { pattern: /version, public: true }
+    - { pattern: /metrics, public: true }
+  local:
+    algorithm: RS256
+    jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}
+    issuer: ${AUTH_ISSUER:identity}
+    audience: ${AUTH_AUDIENCE:api}
+  cache_ttl: 30s
+
+tracing:                                      # enabled + tracer.Config
+  enabled: ${TRACING_ENABLED:false}
+  endpoint: ${OTEL_ENDPOINT:localhost:4317}
+  insecure: true
+  sample_rate: 1.0
+
+metrics:                                      # enabled + path + metrics.Config
+  enabled: ${METRICS_ENABLED:true}
+  path: /metrics
+  namespace: ${METRICS_NAMESPACE:identity}
+
+validator:
+  field_name_tag: json
+
+lifecycle:                                    # lifecycle.Config
+  drain_delay: ${DRAIN_DELAY:0s}              # 5-10s in clusters
+  shutdown_timeout: 20s
+  closer_timeout: 10s
