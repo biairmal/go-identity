@@ -3,7 +3,7 @@ module github.com/biairmal/go-identity
 go 1.26.0
 
 require (
-	github.com/biairmal/go-sdk v0.1.0
+	github.com/biairmal/go-sdk v0.2.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
@@ -114,6 +114,3 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// Points at the local go-sdk checkout until the release with authz is tagged.
-replace github.com/biairmal/go-sdk => ../go-sdk
