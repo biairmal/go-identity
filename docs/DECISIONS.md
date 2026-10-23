@@ -23,3 +23,5 @@ Choices made where the TRD was silent or unclear. One line each: `date · task �
 | 2026-10-22 | T0.4 | A missing or malformed tenant claim is a 401 in `scope.Tenant` | Without a tenant the caller is not authenticated for tenant data; 500 would hide misconfigured tokens |
 | 2026-10-22 | T0.5 | One `apierr.New(reason)` with a reason → code table instead of per-status helpers | A reason can never be paired with the wrong status; the table test pins TRD 9.2 |
 | 2026-10-22 | T0.5 | `httpx.Handle` wraps go-sdk `handler.Handle` | go-sdk's adapter has no hook for response headers; `Retry-After` comes from `meta.retry_after` |
+| 2026-10-23 | T0.6 | chi v5 router instead of `http.ServeMux` | Same as guest-management-be; route groups with their own middleware, and `chi.Walk` for route-list tests |
+| 2026-10-23 | T0.6 | 405 envelope uses code `ERR_METHOD_NOT_ALLOWED`, written with an explicit status | errorz has no 405 code; the status is set directly, so the custom code never maps to 500 |

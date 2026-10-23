@@ -38,9 +38,10 @@ make help
   registration.
 - Return `error`, never `*errorz.Error` (typed-nil trap). Wrap causes and attach an `errorz` code; compare with
   `errors.Is`. Never invent a custom `code` (it maps to 500): finer reasons go in `meta.reason`.
-- Handlers are `handler.Func` wrapped by `handler.Handle`. Never write status codes by hand.
+- Routing is go-chi/chi v5. Handlers are `handler.Func` wrapped by `httpx.Handle`; path parameters come from
+  `chi.URLParam`. Never write status codes by hand.
 - Layers inside a module: `handler` → `service` → `repository`. No upward imports.
-- Modules: `module.go` with `New(cfg, Deps)` and `Register(mux)`; each module's `Config` has `Default()` and
+- Modules: `module.go` with `New(cfg, Deps)` and `Register(r chi.Router)`; each module's `Config` has `Default()` and
   `Validate()` and is one row in the validation table in `internal/app/config.go`.
 - **No module imports another.** Declare a small port in the consumer and wire an adapter in `internal/app`.
   `depguard` (in `make lint`) enforces it.
