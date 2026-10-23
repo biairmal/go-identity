@@ -15,11 +15,13 @@ are generic service-template code (no identity logic) so they can later move int
 | Path | Role |
 |---|---|
 | `cmd/server` | One binary: `serve` (default), `worker`, `migrate` |
-| `internal/app` | Config, dependency wiring, middleware chain, routes, lifecycle |
-| `internal/platform/*` | Shared plumbing: database driver/migrations/tx/outbox, list queries, tenant scope, API errors |
-| `internal/<module>` | One feature boundary each (`tenant`, `rbac`, `user`, …) |
+| `internal/app` | Config, dependency wiring, middleware chain, routes and route groups, adapters between modules, lifecycle |
+| `internal/platform/*` | Generic plumbing, no business rules: database, HTTP conventions and `httpx.Routes`, list queries, tenant scope, API errors, test kit. Never imports `app` or a module |
+| `internal/module/<name>` | One feature boundary each (`audit`, `tenant`, `rbac`, `session`, `user`, `auth`); helpers used by one module are its subpackages |
 | `migrations/` | goose SQL, embedded |
 | `config/config.yaml` | Defaults with `${VAR:default}` |
+
+`internal/` holds only these three directories.
 
 ## Commands
 
@@ -41,10 +43,13 @@ make help
 - Routing is go-chi/chi v5. Handlers are `handler.Func` wrapped by `httpx.Handle`; path parameters come from
   `chi.URLParam`. Never write status codes by hand.
 - Layers inside a module: `handler` → `service` → `repository`. No upward imports.
-- Modules: `module.go` with `New(cfg, Deps)` and `Register(r chi.Router)`; each module's `Config` has `Default()` and
+- Modules: `module.go` with `New(cfg, Deps)` and `Register(rt *httpx.Routes)`. A module mounts its routes into every
+  group it serves (`rt.API`, `rt.Me`, `rt.Admin`, `rt.Internal`, `rt.Root`) and never creates a group; group
+  middleware lives in `internal/app/routes.go`. Each module's `Config` has `Default()` and
   `Validate()` and is one row in the validation table in `internal/app/config.go`.
 - **No module imports another.** Declare a small port in the consumer and wire an adapter in `internal/app`.
-  `depguard` (in `make lint`) enforces it.
+  The architecture test `internal/app/arch_test.go` (in `make test`) enforces it, and keeps `platform` from
+  importing `app` or a module.
 - Response DTOs are never the row struct.
 - Repositories: named-column intent updates only, `tenant_id` in every `WHERE`, a `version` check on editable
   aggregates, no repository cache. Emails and queue messages go through the outbox in the caller's transaction.

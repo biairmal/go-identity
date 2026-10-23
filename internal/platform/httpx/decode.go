@@ -1,6 +1,6 @@
 // Package httpx holds the HTTP conventions every handler shares (TRD 9.1):
 // strict JSON decoding, If-Match versions, and a handler adapter that sets
-// Retry-After on rate-limited errors.
+// Retry-After on rate-limited errors, plus the route groups handed to modules.
 package httpx
 
 import (

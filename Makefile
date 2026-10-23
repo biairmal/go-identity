@@ -25,7 +25,7 @@ test: ## Unit tests
 test-integration: ## Unit + integration tests (Docker needed for Testcontainers)
 	go test ./...
 
-lint: ## golangci-lint (includes the depguard module rule)
+lint: ## golangci-lint
 	golangci-lint run ./...
 
 format: ## gofumpt

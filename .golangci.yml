@@ -1,4 +1,4 @@
-# golangci-lint v2 configuration, copied from go-sdk plus the depguard module rule.
+# golangci-lint v2 configuration, copied from go-sdk.
 # See https://golangci-lint.run/docs/configuration/file/
 
 version: "2"
@@ -11,7 +11,6 @@ linters:
   default: none
   enable:
     - copyloopvar
-    - depguard
     - dupl
     - errcheck
     - errname
@@ -35,22 +34,6 @@ linters:
     - unparam
     - unused
   settings:
-    # A module is a future service boundary: internal/<module> may import
-    # internal/platform, go-sdk and the stdlib, never another internal/<module>.
-    # internal/app (wiring) and cmd are exempt.
-    depguard:
-      rules:
-        modules:
-          list-mode: lax
-          files:
-            - "**/internal/**/*.go"
-            - "!**/internal/app/**"
-            - "!**/internal/platform/**"
-          allow:
-            - github.com/biairmal/go-identity/internal/platform
-          deny:
-            - pkg: github.com/biairmal/go-identity/internal/
-              desc: "modules must not import each other; declare a port and wire an adapter in internal/app"
     errcheck:
       check-type-assertions: true
       check-blank: true
