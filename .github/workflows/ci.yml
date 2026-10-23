@@ -19,7 +19,10 @@ jobs:
           path: go-sdk
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go-identity/go.mod
+          # Newest stable Go with check-latest: go.mod says 1.26.0, and older patch releases
+          # carry standard-library vulnerabilities that govulncheck reports.
+          go-version: stable
+          check-latest: true
           cache-dependency-path: go-identity/go.sum
       - name: Install tools
         run: |
