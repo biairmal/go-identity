@@ -16,7 +16,7 @@ func (a *App) routes(modules []Module) *http.ServeMux {
 	mux.Handle("GET /readyz", httpkit.Readiness(a.readiness))
 	mux.Handle("GET /version", httpkit.Version(a.cfg.Service.Version))
 	if a.cfg.Metrics.Enabled {
-		mux.Handle("GET "+a.cfg.Metrics.Path, promhttp.Handler())
+		mux.Handle("GET "+a.cfg.Metrics.Path, promhttp.HandlerFor(a.metrics, promhttp.HandlerOpts{}))
 	}
 	for _, m := range modules {
 		m.Register(mux)

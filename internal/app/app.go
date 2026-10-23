@@ -21,6 +21,8 @@ import (
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/migrations"
@@ -32,6 +34,7 @@ type App struct {
 	log     logger.Logger
 	db      *sqlkit.DB
 	tracer  tracer.Tracer
+	metrics *prometheus.Registry
 	handler http.Handler
 	ready   atomic.Bool
 }
@@ -49,7 +52,8 @@ func NewLogger(cfg *Config) logger.Logger {
 func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 	a := &App{cfg: *cfg, log: log}
 
-	tr, rec, err := observability(cfg, log)
+	a.metrics = newRegistry()
+	tr, rec, err := observability(cfg, log, a.metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +104,7 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 }
 
 // observability builds the tracer and metrics recorder, or NoOps when disabled.
-func observability(cfg *Config, log logger.Logger) (tracer.Tracer, metrics.Recorder, error) {
+func observability(cfg *Config, log logger.Logger, reg prometheus.Registerer) (tracer.Tracer, metrics.Recorder, error) {
 	tr := tracer.NewNoOp()
 	if cfg.Tracing.Enabled {
 		var err error
@@ -111,7 +115,8 @@ func observability(cfg *Config, log logger.Logger) (tracer.Tracer, metrics.Recor
 	rec := metrics.NewNoOp()
 	if cfg.Metrics.Enabled {
 		var err error
-		if rec, err = metrics.NewPrometheus(cfg.Metrics.Config, metrics.WithLogger(log)); err != nil {
+		rec, err = metrics.NewPrometheus(cfg.Metrics.Config, metrics.WithLogger(log), metrics.WithRegisterer(reg))
+		if err != nil {
 			if serr := tr.Shutdown(context.Background()); serr != nil {
 				log.Error("tracer shutdown", logger.F("error", serr.Error()))
 			}
@@ -192,4 +197,12 @@ func checkSchema(ctx context.Context, db *sqlkit.DB) error {
 		return err
 	}
 	return m.EnsureCurrent(ctx)
+}
+
+// newRegistry is the app's own metrics registry (not the process-global
+// default), with the Go runtime and process collectors.
+func newRegistry() *prometheus.Registry {
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	return reg
 }

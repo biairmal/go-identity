@@ -15,3 +15,6 @@ Choices made where the TRD was silent or unclear. One line each: `date Â· task Â
 | 2026-10-22 | T0.2 | Outbox retry backoff is `2^attempts - 1` seconds from `created_at`, capped at 2^10 s | The TRD 5.2 `outbox` table has no next-attempt column; this needs none |
 | 2026-10-22 | T0.2 | Outbox rows stay locked while they are sent, inside the claiming transaction | Guarantees two dispatchers never send one row concurrently without an extra lease column |
 | 2026-10-22 | T0.2 | `bootstrap.sql` also creates `pgcrypto` | The `identity` role may lack the privilege to create extensions |
+| 2026-10-22 | T0.3 | No `testkit/fixtures.go` yet | There are no business tables to seed; the tasks that add users and roles add their fixtures |
+| 2026-10-22 | T0.3 | `testkit.Server` takes an `http.Handler` (`app.Handler()`) | Keeps `internal/platform` free of an `internal/app` import |
+| 2026-10-22 | T0.3 | The app owns its Prometheus registry | The global default registry rejects a second app in the same process (tests, mounted mode) |
