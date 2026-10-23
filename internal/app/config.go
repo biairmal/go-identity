@@ -10,9 +10,16 @@ import (
 	"github.com/biairmal/go-sdk/lib/lifecycle"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/metrics"
+	"github.com/biairmal/go-sdk/lib/redis"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
+
+	identityauth "github.com/biairmal/go-identity/internal/module/auth"
+	"github.com/biairmal/go-identity/internal/module/rbac"
+	"github.com/biairmal/go-identity/internal/module/session"
+	"github.com/biairmal/go-identity/internal/module/tenant"
+	"github.com/biairmal/go-identity/internal/module/user"
 )
 
 // Environments for ServiceConfig.Environment.
@@ -29,12 +36,34 @@ type Config struct {
 	HTTP      HTTPConfig       `mapstructure:"http"`
 	Log       logger.Options   `mapstructure:"log"`
 	Database  sqlkit.Config    `mapstructure:"database"`
+	Redis     RedisConfig      `mapstructure:"redis"`
 	Auth      AuthConfig       `mapstructure:"auth"`
 	Tracing   TracingConfig    `mapstructure:"tracing"`
 	Metrics   MetricsConfig    `mapstructure:"metrics"`
 	Validator validator.Config `mapstructure:"validator"`
 	Lifecycle lifecycle.Config `mapstructure:"lifecycle"`
+	Modules   Modules          `mapstructure:"modules"`
 }
+
+// Modules holds one block per module, so a setting lives with the module that
+// reads it. The audit module has no settings.
+type Modules struct {
+	Auth    identityauth.Config `mapstructure:"auth"`
+	Session session.Config      `mapstructure:"session"`
+	Tenant  tenant.Config       `mapstructure:"tenant"`
+	User    user.Config         `mapstructure:"user"`
+	RBAC    rbac.Config         `mapstructure:"rbac"`
+}
+
+// RedisConfig toggles Redis; the rest is go-sdk redis.Config. Redis is
+// optional: without an address the login rate limits fall back to in-memory,
+// which only limits per pod.
+type RedisConfig struct {
+	redis.Config `mapstructure:",squash"`
+}
+
+// Enabled reports whether an address is configured.
+func (r *RedisConfig) Enabled() bool { return r.Address != "" }
 
 // ServiceConfig identifies the running service.
 type ServiceConfig struct {
@@ -88,11 +117,18 @@ func (c *Config) sections() []section {
 		{"service", c.Service.validate},
 		{"http", c.HTTP.validate},
 		{"database", c.Database.Validate},
+		{"redis", c.validateRedis},
 		{"auth", c.validateAuth},
 		{"tracing", c.validateTracing},
 		{"metrics", c.validateMetrics},
 		{"validator", c.Validator.Validate},
 		{"lifecycle", c.Lifecycle.Validate},
+		{"modules.auth", c.Modules.Auth.Validate},
+		{"modules.session", c.Modules.Session.Validate},
+		{"modules.tenant", c.Modules.Tenant.Validate},
+		{"modules.user", c.Modules.User.Validate},
+		{"modules.rbac", c.Modules.RBAC.Validate},
+		{"modules", c.validateModules},
 	}
 }
 
@@ -155,16 +191,56 @@ func (c *Config) validateMetrics() error {
 	return c.Metrics.Validate()
 }
 
-// LoadConfig reads the optional envFile and the YAML file, fills derived
-// defaults and validates the result.
+// validateRedis only checks a configured Redis. Without an address Redis is
+// off and the login rate limits fall back to in-memory. go-sdk's redis.Config
+// has no Validate, so the mode is checked here.
+func (c *Config) validateRedis() error {
+	if !c.Redis.Enabled() {
+		return nil
+	}
+	switch c.Redis.Mode {
+	case redis.ModeStandalone, redis.ModeSentinel, redis.ModeCluster:
+		return nil
+	default:
+		return errorz.BadRequest().WithMessage("mode must be standalone, sentinel or cluster")
+	}
+}
+
+// validateModules holds the rules that span modules, which no single module
+// can check on its own.
+func (c *Config) validateModules() error {
+	for _, role := range c.Modules.Auth.Registration.DefaultRoles {
+		if !c.Modules.RBAC.HasRole(role) {
+			return errorz.BadRequest().WithMessage(
+				"auth.registration.default_roles contains " + role + ", which is not a role in rbac.roles")
+		}
+	}
+	return nil
+}
+
+// LoadConfig starts from the module defaults, reads the optional envFile and
+// the YAML file over them, fills derived defaults and validates the result.
+// Starting from the defaults means the YAML only has to set what differs.
 func LoadConfig(envFile, file string) (Config, error) {
-	var c Config
+	c := Config{Modules: defaultModules()}
 	if err := config.Load(&c, config.EnvFile(envFile), config.Files(file)); err != nil {
 		return c, err
 	}
 	c.applyDefaults()
 	err := c.Validate()
 	return c, err
+}
+
+// defaultModules is every module's Default(), so a key absent from the YAML
+// keeps the value its own module chose.
+func defaultModules() Modules {
+	return Modules{
+		Auth:    identityauth.Default(),
+		Session: session.Default(),
+		Tenant:  tenant.Default(),
+		User:    user.Default(),
+		RBAC:    rbac.Default(),
+	}
 }
 
 // applyDefaults fills values derived from other sections.

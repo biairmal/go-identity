@@ -67,3 +67,72 @@ lifecycle:                                    # lifecycle.Config
   drain_delay: ${DRAIN_DELAY:0s}              # 5-10s in clusters
   shutdown_timeout: 20s
   closer_timeout: 10s
+
+redis:                                        # optional; login rate limits
+  mode: standalone                            # standalone | sentinel | cluster
+  address: ${REDIS_ADDR:}                     # empty = no Redis, per-pod in-memory limits
+  password: ${REDIS_PASSWORD:}
+
+# One block per module: a setting lives with the module that reads it. Only
+# values that differ from the module's Default() need to appear here.
+modules:
+  auth:                                       # sign-in flows, tokens, /v1/auth, /v1/me
+    public_url: ${IDENTITY_PUBLIC_URL:http://localhost:8080}
+    frontend_urls: [${FRONTEND_URL:http://localhost:3000}]
+    service_clients: []                       # [{id, secret_hash}] for /v1/internal callers
+
+    providers:
+      password:
+        enabled: ${AUTH_PASSWORD_ENABLED:true}
+        min_length: 10
+        require_email_verification: true
+        breached_password_check: false
+      google:
+        enabled: ${AUTH_GOOGLE_ENABLED:false}
+        client_id: ${GOOGLE_CLIENT_ID:}
+        client_secret: ${GOOGLE_CLIENT_SECRET:}
+        allowed_domains: []
+        auto_link_verified_email: true
+
+    registration:
+      enabled: ${REGISTRATION_ENABLED:true}   # false = invite-only
+      default_roles: [member]
+
+    token:                                    # access token; refresh is modules.session
+      issuer: ${TOKEN_ISSUER:identity}
+      audience: [${TOKEN_AUDIENCE:api}]
+      access_ttl: 15m
+      claims: roles                           # roles | roles_and_permissions
+      signing_keys_dir: ${SIGNING_KEYS_DIR:/etc/identity/keys}
+
+    security:
+      login_rate_limit: 10/5m                 # per IP and per email
+      lockout_after_failures: 10
+      lockout_duration: 15m
+
+  session:                                    # refresh-token families
+    refresh_ttl: 720h                         # 30 days, sliding on rotation
+    refresh_absolute_ttl: 2160h               # 90 days, then sign in again
+    refresh_reuse_grace: 10s                  # tolerates refreshes racing across pods
+
+  tenant:
+    mode: ${TENANCY_MODE:single}              # single | multi
+    default_tenant_slug: default
+    resolve_from: [token, header]             # header only on login and register
+    allow_self_service_tenants: false
+
+  user:
+    super_admin:                              # first start only; forced change at first login
+      email: ${SUPER_ADMIN_EMAIL:}
+      password: ${SUPER_ADMIN_PASSWORD:}
+
+  rbac:
+    seed_on_start: true
+    permissions:                              # catalog; services check these strings
+      - { key: users:read,   description: View users }
+      - { key: users:manage, description: Invite, disable and assign roles to users }
+      - { key: roles:manage, description: Create and edit roles }
+      - { key: audit:read,   description: View the audit log }
+    roles:                                    # seeded once into each tenant
+      admin:  [users:read, users:manage, roles:manage, audit:read]
+      member: []
