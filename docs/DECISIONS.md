@@ -29,3 +29,4 @@ Choices made where the TRD was silent or unclear. One line each: `date Â· task Â
 | 2026-10-23 | T0.7 | An architecture test (`internal/app/arch_test.go`, via `go list`) replaces the depguard module rule | depguard cannot say "any module except its own" in one rule |
 | 2026-10-23 | T0.7 | `Register` takes `*httpx.Routes` (TRD 3.5 shows a value) | Five routers make the struct large enough for the `hugeParam` lint, as with `*ListParseConfig` |
 | 2026-10-23 | T1.4 | go-identity requires go-sdk `v0.2.0`; the `../go-sdk` replace is gone | go-sdk v0.2.0 ships `authz` |
+| 2026-10-23 | T0.1 | CI runs the newest stable Go (`setup-go` with `go-version: stable`, `check-latest: true`), not the `go 1.26.0` in `go.mod` | govulncheck reports standard-library fixes that only ship in later patch releases; `go.mod` keeps the minimum version |

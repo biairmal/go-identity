@@ -81,16 +81,7 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 		return nil, err
 	}
 
-	chain := []func(http.Handler) http.Handler{
-		middleware.Metrics(rec, nil),
-		middleware.Recover(),
-		middleware.RequestID(),
-		middleware.Correlation(),
-		middleware.Tracing(tr),
-		middleware.Logging(log, &middleware.LoggingOptions{LogResponse: true}),
-		cors(cfg.HTTP.CORS),
-		maxBody(cfg.HTTP.MaxBodyBytes),
-	}
+	chain := middlewareChain(cfg, log, tr, rec)
 	authMW, err := a.authMiddleware()
 	if err != nil {
 		a.close(ctx)
@@ -101,6 +92,23 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 	}
 	a.handler = a.routes(modules, chain)
 	return a, nil
+}
+
+// middlewareChain is the shared middleware, outermost first (TRD 3.3). The
+// auth middleware is appended after it when auth is enabled.
+func middlewareChain(
+	cfg *Config, log logger.Logger, tr tracer.Tracer, rec metrics.Recorder,
+) []func(http.Handler) http.Handler {
+	return []func(http.Handler) http.Handler{
+		middleware.Metrics(rec, nil),
+		middleware.Recover(),
+		middleware.RequestID(),
+		middleware.Correlation(),
+		middleware.Tracing(tr),
+		middleware.Logging(log, &middleware.LoggingOptions{LogResponse: true}),
+		cors(cfg.HTTP.CORS),
+		maxBody(cfg.HTTP.MaxBodyBytes),
+	}
 }
 
 // observability builds the tracer and metrics recorder, or NoOps when disabled.
