@@ -1,0 +1,1942 @@
+openapi: 3.1.0
+
+# The machine-readable form of TRD section 9. The TRD is the source of truth:
+# when the two disagree, fix whichever is wrong against the TRD and record why
+# in docs/DECISIONS.md. Contract tests (T7.3) keep them in line once the
+# handlers exist.
+#
+# Run a mock server from this file:
+#   npx @stoplight/prism-cli mock api/openapi.yaml
+
+info:
+  title: go-identity
+  version: 0.1.0
+  license:
+    name: Proprietary
+    url: https://github.com/biairmal/go-identity
+  description: |
+    Identity service: sign-in, users, roles, permissions, tenants and an audit
+    log. It is the only issuer of tokens; resource services validate them
+    locally against `/.well-known/jwks.json` and never call identity per
+    request.
+
+    **Envelope.** Every response is wrapped: success is `{timestamp, data}`,
+    failure is `{timestamp, error: {code, message, meta}}`. `error.code` is an
+    errorz code and selects the HTTP status; clients branch on
+    `error.meta.reason`, never on `message`. The only exception is
+    `/.well-known/jwks.json`, which serves a raw RFC 7517 key set.
+
+    **Tenancy.** The tenant always comes from the token's `tid` claim. No
+    request accepts `tenant_id`, except the super-admin routes and the named
+    sign-in fields.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: auth
+    description: Sign-in flows. Public unless marked otherwise.
+  - name: me
+    description: The calling user. No extra permission; the target is the caller.
+  - name: admin
+    description: Tenant administration. Permission-checked against the database.
+  - name: superadmin
+    description: Platform administration. Multi mode only; 404 in single mode.
+  - name: internal
+    description: For resource services, with a service token.
+  - name: operational
+    description: Health, version and the public key set.
+
+security:
+  - bearer: []
+
+paths:
+  /.well-known/jwks.json:
+    get:
+      tags: [operational]
+      summary: Public signing keys
+      description: |
+        The RFC 7517 key set, published without the envelope because JWKS
+        clients expect the bare form. Carries a five-minute Cache-Control.
+        Next, active and retiring keys are all published, so a rotation is
+        cached by resource services before the new key starts signing.
+      operationId: getJWKS
+      security: []
+      responses:
+        "200":
+          description: The key set
+          headers:
+            Cache-Control:
+              schema: { type: string }
+              example: public, max-age=300
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items: { $ref: "#/components/schemas/JWK" }
+
+  /healthz:
+    get:
+      tags: [operational]
+      summary: Liveness
+      description: The process is up. No dependency is checked.
+      operationId: getHealth
+      security: []
+      responses:
+        "200": { description: Alive }
+
+  /readyz:
+    get:
+      tags: [operational]
+      summary: Readiness
+      description: |
+        Not shutting down and the leader database is healthy. Redis is never a
+        readiness check, so a cache outage does not take pods out of the load
+        balancer.
+      operationId: getReadiness
+      security: []
+      responses:
+        "200": { description: Ready }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /version:
+    get:
+      tags: [operational]
+      summary: Service version
+      operationId: getVersion
+      security: []
+      responses:
+        "200":
+          description: The running version
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          version: { type: string, example: 1.4.0 }
+
+  /v1/auth/config:
+    get:
+      tags: [auth]
+      summary: What the sign-in screen should show
+      description: Nothing secret; the frontend renders its providers from this.
+      operationId: getAuthConfig
+      security: []
+      responses:
+        "200":
+          description: Enabled providers and modes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/AuthConfig" }
+
+  /v1/auth/register:
+    post:
+      tags: [auth]
+      summary: Register with a password
+      description: |
+        Rate limited. Always answers 202 with the same body whether or not the
+        email is already taken, so the endpoint cannot be used to discover
+        accounts. An existing address receives an "account already exists"
+        email instead of a verification link.
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Sign in with a password
+      description: |
+        Rate limited per IP and per email. An unknown email and a wrong
+        password return identical bodies.
+
+        In multi mode, a user who belongs to several tenants and named none
+        gets 200 with `tenant_required` and the tenants to choose from, and no
+        tokens. When a password change is forced, the access token is
+        restricted to `POST /v1/me/password` and no refresh token is issued.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/TokenOrTenantChoice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/google/start:
+    get:
+      tags: [auth]
+      summary: Begin Google sign-in
+      description: |
+        Redirects to Google with state, nonce and a PKCE challenge.
+        `redirect_to` must be in the configured frontend allow-list.
+      operationId: googleStart
+      security: []
+      parameters:
+        - name: redirect_to
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+        - name: tenant
+          in: query
+          schema: { type: string }
+      responses:
+        "302": { description: Redirect to Google }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/auth/google/callback:
+    get:
+      tags: [auth]
+      summary: Google redirects back here
+      description: |
+        Redirects to the frontend with a single-use exchange code on success,
+        or with an error reason on failure. Tokens never appear in a URL,
+        because a URL ends up in browser history and server logs.
+      operationId: googleCallback
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "302": { description: Redirect to the frontend with a code or an error }
+
+  /v1/auth/google/link/start:
+    get:
+      tags: [me]
+      summary: Link Google to the signed-in account
+      operationId: googleLinkStart
+      parameters:
+        - name: redirect_to
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+      responses:
+        "302": { description: Redirect to Google }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/auth/exchange:
+    post:
+      tags: [auth]
+      summary: Exchange a Google callback code for tokens
+      description: The code is single use and lives 60 seconds.
+      operationId: exchange
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/TokenResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Exchange a refresh token for a new pair
+      description: |
+        Rate limited. The presented token is rotated; presenting it again
+        after the grace window revokes its whole family. Roles and user status
+        are re-read, so a role change takes effect here.
+      operationId: refresh
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/TokenResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Sign out of this device
+      description: >
+        Revokes the token's family. Idempotent, so an already invalid token
+        also returns 204.
+      operationId: logout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "204": { description: Signed out }
+
+  /v1/auth/logout-all:
+    post:
+      tags: [auth]
+      summary: Sign out everywhere
+      operationId: logoutAll
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "204": { description: Signed out of every device }
+
+  /v1/auth/switch-tenant:
+    post:
+      tags: [auth]
+      summary: Switch to another tenant
+      description: Multi mode only. Starts a new refresh family for that tenant.
+      operationId: switchTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id]
+              properties:
+                tenant_id: { type: string, format: uuid }
+      responses:
+        "200": { $ref: "#/components/responses/TokenResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/auth/password/forgot:
+    post:
+      tags: [auth]
+      summary: Ask for a password reset link
+      description: Rate limited. Always 202, so the endpoint reveals nothing about an address.
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/password/reset:
+    post:
+      tags: [auth]
+      summary: Set a new password from a reset link
+      description: Rate limited. Revokes every refresh family of the user.
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "204": { description: Password changed }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/email/verify:
+    post:
+      tags: [auth]
+      summary: Verify an email address
+      operationId: verifyEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "204": { description: Verified }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /v1/auth/email/resend:
+    post:
+      tags: [auth]
+      summary: Resend the verification email
+      description: Rate limited. Always 202; only an existing unverified account is sent anything.
+      operationId: resendVerification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/invite/{token}:
+    get:
+      tags: [auth]
+      summary: What an invite is for
+      description: >
+        Lets the accept screen render. The email is masked, so a leaked link
+        does not disclose it.
+      operationId: getInvite
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The invite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/InvitePreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /v1/auth/invite/accept:
+    post:
+      tags: [auth]
+      summary: Accept an invite
+      operationId: acceptInvite
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                password:
+                  type: string
+                  format: password
+                  description: Required only when the account has no password yet.
+                display_name: { type: string, maxLength: 100 }
+      responses:
+        "200": { $ref: "#/components/responses/TokenResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /v1/auth/token:
+    post:
+      tags: [internal]
+      summary: Service token for a resource service
+      description: >
+        Client credentials for the internal routes. The token carries the
+        internal scope and lives five minutes. Never used by a browser.
+      operationId: serviceToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                client_id: { type: string }
+                client_secret: { type: string, format: password }
+      responses:
+        "200":
+          description: A service token
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ServiceToken" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/me:
+    get:
+      tags: [me]
+      summary: The calling user
+      operationId: getMe
+      responses:
+        "200":
+          description: The user, their roles and their effective permissions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [me]
+      summary: Update the calling user
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "200":
+          description: The updated user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Me" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/me/password:
+    post:
+      tags: [me]
+      summary: Change the password
+      description: |
+        Returns a fresh session and revokes every other family, so a stolen
+        password cannot keep a session alive. Accepts the restricted token
+        issued when a password change is forced.
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                  description: >
+                    Omitted when using the restricted token, or when the
+                    account has no password yet.
+                new_password: { type: string, format: password }
+      responses:
+        "200": { $ref: "#/components/responses/TokenResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/me/tenants:
+    get:
+      tags: [me]
+      summary: Tenants the caller belongs to
+      operationId: listMyTenants
+      responses:
+        "200":
+          description: Active memberships
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/TenantSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/me/sessions:
+    get:
+      tags: [me]
+      summary: The caller's active sessions
+      operationId: listMySessions
+      responses:
+        "200":
+          description: One entry per device
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Session" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/me/sessions/{id}:
+    delete:
+      tags: [me]
+      summary: Sign one device out
+      operationId: revokeMySession
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "204": { description: Session revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/me/identities/google:
+    delete:
+      tags: [me]
+      summary: Unlink Google
+      description: Refused when it is the only remaining way to sign in.
+      operationId: unlinkGoogle
+      responses:
+        "204": { description: Unlinked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/users:
+    get:
+      tags: [admin]
+      summary: List users in the tenant
+      description: >
+        Requires users:read. The search term matches the display name, or an
+        exact email through the blind index.
+      operationId: listUsers
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - name: sort
+          in: query
+          description: Repeatable, field and direction.
+          schema:
+            type: array
+            items:
+              type: string
+              enum: ["display_name,ASC", "display_name,DESC", "created_at,ASC", "created_at,DESC"]
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, active, disabled] }
+        - name: role
+          in: query
+          schema: { type: string, format: uuid }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of users
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PageResponse"
+                          - type: object
+                            properties:
+                              items:
+                                type: array
+                                items: { $ref: "#/components/schemas/AdminUser" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/admin/users/invite:
+    post:
+      tags: [admin]
+      summary: Invite a user
+      description: >
+        Requires users:manage. Re-inviting resends the email without touching
+        an existing password.
+      operationId: inviteUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role_ids]
+              properties:
+                email: { type: string, format: email }
+                role_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                display_name: { type: string, maxLength: 100 }
+      responses:
+        "202":
+          description: Invited
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, example: invited }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/admin/users/{id}:
+    get:
+      tags: [admin]
+      summary: One user
+      description: Requires users:read.
+      operationId: getUser
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/AdminUserDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      summary: Remove a user from the tenant
+      description: |
+        Requires users:manage. Removes the membership and the user's roles in
+        this tenant; the account itself survives, because it may belong to
+        other tenants.
+      operationId: removeUser
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/admin/users/{id}/roles:
+    put:
+      tags: [admin]
+      summary: Replace a user's roles
+      description: |
+        Requires users:manage. A full replacement. Refused when it would grant
+        a permission the admin does not hold, change the admin's own roles,
+        leave the tenant without a roles:manage holder, or touch the super
+        admin.
+      operationId: setUserRoles
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_ids]
+              properties:
+                role_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The roles after the change
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          roles:
+                            type: array
+                            items: { $ref: "#/components/schemas/RoleRef" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/users/{id}/disable:
+    post:
+      tags: [admin]
+      summary: Disable a user
+      description: |
+        Requires users:manage. Revokes their sessions. Refused for the super
+        admin, for the last roles:manage holder, and for yourself.
+      operationId: disableUser
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "204": { description: Disabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/users/{id}/enable:
+    post:
+      tags: [admin]
+      summary: Enable a user
+      description: Requires users:manage.
+      operationId: enableUser
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "204": { description: Enabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/admin/users/{id}/revoke-sessions:
+    post:
+      tags: [admin]
+      summary: Sign a user out everywhere
+      description: >
+        Requires users:manage. Also the way to make a role change take effect
+        immediately rather than at the next refresh.
+      operationId: revokeUserSessions
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "204": { description: Sessions revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/admin/permissions:
+    get:
+      tags: [admin]
+      summary: The permission catalog
+      description: |
+        Requires roles:manage. Admins compose roles from this list and cannot
+        invent keys, because a key no service checks would do nothing.
+      operationId: listPermissions
+      responses:
+        "200":
+          description: Every permission in the catalog
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Permission" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/admin/roles:
+    get:
+      tags: [admin]
+      summary: List roles
+      description: Requires roles:manage.
+      operationId: listRoles
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of roles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PageResponse"
+                          - type: object
+                            properties:
+                              items:
+                                type: array
+                                items: { $ref: "#/components/schemas/RoleSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [admin]
+      summary: Create a role
+      description: Requires roles:manage. Only permissions the admin holds may be granted.
+      operationId: createRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 50 }
+                description: { type: string }
+                permissions:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: The created role
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/roles/{id}:
+    get:
+      tags: [admin]
+      summary: One role
+      description: Requires roles:manage.
+      operationId: getRole
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The role with its permissions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [admin]
+      summary: Rename a role
+      description: Requires roles:manage and the current version. System roles cannot be edited.
+      operationId: updateRole
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 50 }
+                description: { type: string }
+                version:
+                  type: integer
+                  description: An alternative to the If-Match header.
+      responses:
+        "200":
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+    delete:
+      tags: [admin]
+      summary: Delete a role
+      description: |
+        Requires roles:manage. An assigned role needs the force flag, which
+        removes the assignments in the same transaction.
+      operationId: deleteRole
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+        - name: force
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/roles/{id}/permissions:
+    put:
+      tags: [admin]
+      summary: Replace a role's permissions
+      description: |
+        Requires roles:manage and the current version. A full replacement. An
+        admin cannot grant a permission they do not hold, nor edit a role they
+        hold that carries roles:manage.
+      operationId: setRolePermissions
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions:
+                  type: array
+                  items: { type: string }
+                version: { type: integer }
+      responses:
+        "200":
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+
+  /v1/admin/audit:
+    get:
+      tags: [admin]
+      summary: Read the audit log
+      description: |
+        Requires audit:read. Newest first, scoped to the caller's tenant. The
+        action filter accepts a like pattern, such as role.%
+      operationId: listAudit
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - name: actor
+          in: query
+          schema: { type: string, format: uuid }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: A page of audit entries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PageResponse"
+                          - type: object
+                            properties:
+                              items:
+                                type: array
+                                items: { $ref: "#/components/schemas/AuditEntry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/admin/tenants:
+    get:
+      tags: [superadmin]
+      summary: List tenants
+      description: Super admin only. 404 in single mode.
+      operationId: listTenants
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, suspended] }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of tenants
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/PageResponse"
+                          - type: object
+                            properties:
+                              items:
+                                type: array
+                                items: { $ref: "#/components/schemas/Tenant" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [superadmin]
+      summary: Create a tenant
+      description: |
+        Super admin only. Copies the role templates and invites the first
+        admin in one transaction, so a tenant is never half set up.
+      operationId: createTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name, first_admin_email]
+              properties:
+                slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,62}$" }
+                name: { type: string }
+                first_admin_email: { type: string, format: email }
+      responses:
+        "201":
+          description: The created tenant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/tenants/{id}:
+    get:
+      tags: [superadmin]
+      summary: One tenant
+      operationId: getTenant
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The tenant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Tenant" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [superadmin]
+      summary: Rename or suspend a tenant
+      description: |
+        Suspending blocks sign-in and refresh for that tenant; existing access
+        tokens die within their lifetime. The default tenant cannot be
+        suspended.
+      operationId: updateTenant
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                status: { type: string, enum: [active, suspended] }
+                version: { type: integer }
+      responses:
+        "200":
+          description: The updated tenant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+
+  /v1/admin/role-templates:
+    get:
+      tags: [superadmin]
+      summary: List role templates
+      description: >
+        Templates are copied into each new tenant; editing one does not change
+        existing tenants.
+      operationId: listRoleTemplates
+      responses:
+        "200":
+          description: Every template
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Role" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [superadmin]
+      summary: Create a role template
+      operationId: createRoleTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 50 }
+                description: { type: string }
+                permissions:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: The created template
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/role-templates/{id}:
+    patch:
+      tags: [superadmin]
+      summary: Update a role template
+      description: Affects only tenants created afterwards.
+      operationId: updateRoleTemplate
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 50 }
+                description: { type: string }
+                permissions:
+                  type: array
+                  items: { type: string }
+                version: { type: integer }
+      responses:
+        "200":
+          description: The updated template
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+    delete:
+      tags: [superadmin]
+      summary: Delete a role template
+      operationId: deleteRoleTemplate
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/internal/users/{id}:
+    get:
+      tags: [internal]
+      summary: Look up a user
+      description: >
+        Service token only. Carries no email, because a resource service has
+        no use for one.
+      operationId: internalGetUser
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          display_name: { type: string }
+                          status: { type: string, enum: [pending, active, disabled] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/internal/tenants/{id}:
+    get:
+      tags: [internal]
+      summary: Look up a tenant
+      description: >
+        Service token only. Lets a resource service see a suspension sooner
+        than token expiry would.
+      operationId: internalGetTenant
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/PathID"
+      responses:
+        "200":
+          description: The tenant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/TenantSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/internal/roles/permissions:
+    get:
+      tags: [internal]
+      summary: A tenant's role to permission map
+      description: |
+        Service token only. Consumed by the go-sdk authz package with the
+        identity source, which caches it, so access tokens can stay small and
+        a role edit is picked up within the cache lifetime.
+      operationId: internalRolePermissions
+      security:
+        - serviceToken: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The map
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/RolePermissionMap" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: An access token from any sign-in endpoint.
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A token with the internal scope, from the service token endpoint.
+
+  parameters:
+    PathID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      description: 1-based.
+      schema: { type: integer, minimum: 1, default: 1 }
+    Size:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IfMatch:
+      name: If-Match
+      in: header
+      description: |
+        The resource's current version, quoted. Required on updates to
+        editable resources unless the version is in the body; missing is 428
+        and a stale value is 409.
+      schema: { type: string, example: "\"3\"" }
+
+  responses:
+    Accepted:
+      description: Accepted. The body is the same whether or not the address exists.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: accepted }
+    TokenResponse:
+      description: A signed-in session
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TokenPayload" }
+    TokenOrTenantChoice:
+      description: |
+        A signed-in session, or the tenants to choose from when the user
+        belongs to several and named none.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - type: object
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: "#/components/schemas/TokenPayload"
+                      - $ref: "#/components/schemas/TenantChoice"
+    BadRequest:
+      description: |
+        Validation failed, or a one-time token is invalid. Reasons include
+        TOKEN_INVALID, PASSWORD_POLICY and OAUTH_STATE_INVALID.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: |
+        No, bad or expired credentials. Reasons include INVALID_CREDENTIALS,
+        ACCOUNT_LOCKED, REFRESH_REUSED and REFRESH_EXPIRED.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: |
+        Authenticated but not allowed. Reasons include EMAIL_NOT_VERIFIED,
+        ACCOUNT_DISABLED, PASSWORD_CHANGE_REQUIRED, TENANT_SUSPENDED,
+        NOT_A_MEMBER, REGISTRATION_CLOSED, PERMISSION_NOT_HELD,
+        SELF_ESCALATION, SYSTEM_ROLE, SUPER_ADMIN_PROTECTED,
+        OAUTH_EMAIL_UNVERIFIED and OAUTH_DOMAIN_NOT_ALLOWED.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: |
+        No such resource, or the route is inactive in this configuration. A
+        resource outside the caller's tenant is also 404, never 403, so
+        another tenant's IDs cannot be probed. Reason PROVIDER_DISABLED
+        applies when a sign-in provider is off.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: |
+        The change conflicts with the current state. Reasons include
+        VERSION_CONFLICT, DUPLICATE, LAST_ADMIN, ROLE_IN_USE and
+        LAST_SIGN_IN_METHOD.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    PreconditionRequired:
+      description: The route needs an If-Match header or a body version, and neither was sent.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Rate limit hit. Reason RATE_LIMITED, with a Retry-After header.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unavailable:
+      description: Not ready, or a hard dependency is down.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  schemas:
+    Envelope:
+      type: object
+      required: [timestamp]
+      properties:
+        timestamp: { type: string, format: date-time }
+
+    ErrorEnvelope:
+      type: object
+      required: [timestamp, error]
+      properties:
+        timestamp: { type: string, format: date-time }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: An errorz code; it selects the HTTP status.
+              example: ERR_BAD_REQUEST
+            message:
+              type: string
+              description: For humans and logs. Never branch on it.
+            meta:
+              type: object
+              description: Machine-readable detail.
+              properties:
+                reason: { $ref: "#/components/schemas/Reason" }
+                fields:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: Per-field validation messages, keyed by JSON field name.
+                retry_after:
+                  type: integer
+                  description: Seconds, on a rate-limited or locked-out response.
+              additionalProperties: true
+
+    Reason:
+      type: string
+      description: The reason clients branch on (TRD 9.2).
+      enum:
+        - INVALID_CREDENTIALS
+        - ACCOUNT_LOCKED
+        - EMAIL_NOT_VERIFIED
+        - ACCOUNT_DISABLED
+        - PASSWORD_CHANGE_REQUIRED
+        - TENANT_REQUIRED
+        - TENANT_SUSPENDED
+        - NOT_A_MEMBER
+        - TOKEN_INVALID
+        - REFRESH_REUSED
+        - REFRESH_EXPIRED
+        - PROVIDER_DISABLED
+        - OAUTH_STATE_INVALID
+        - OAUTH_EMAIL_UNVERIFIED
+        - OAUTH_DOMAIN_NOT_ALLOWED
+        - REGISTRATION_CLOSED
+        - PASSWORD_POLICY
+        - LAST_SIGN_IN_METHOD
+        - PERMISSION_NOT_HELD
+        - SELF_ESCALATION
+        - LAST_ADMIN
+        - SYSTEM_ROLE
+        - ROLE_IN_USE
+        - SUPER_ADMIN_PROTECTED
+        - VERSION_CONFLICT
+        - DUPLICATE
+        - RATE_LIMITED
+
+    PageResponse:
+      type: object
+      required: [items, total, page, size, total_pages, has_prev, has_next]
+      properties:
+        items: { type: array, items: {} }
+        total: { type: integer }
+        page: { type: integer }
+        size: { type: integer }
+        total_pages: { type: integer }
+        has_prev: { type: boolean }
+        has_next: { type: boolean }
+
+    JWK:
+      type: object
+      required: [kty, kid, use, alg, n, e]
+      properties:
+        kty: { type: string, example: RSA }
+        kid: { type: string, example: 2026-10-a }
+        use: { type: string, example: sig }
+        alg: { type: string, example: RS256 }
+        n: { type: string, description: "Modulus, base64url encoded." }
+        e: { type: string, description: "Exponent, base64url encoded." }
+
+    AuthConfig:
+      type: object
+      required: [providers, registration, tenancy]
+      properties:
+        providers:
+          type: object
+          required: [password, google]
+          properties:
+            password: { type: boolean }
+            google: { type: boolean }
+        registration:
+          type: boolean
+          description: False means invite-only; the sign-up screen should 404.
+        tenancy: { type: string, enum: [single, multi] }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, display_name]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, format: password }
+        display_name: { type: string, minLength: 1, maxLength: 100 }
+        tenant:
+          type: string
+          description: Required in multi mode; ignored in single mode.
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        tenant:
+          type: string
+          description: Tenant slug. Multi mode, when the user has several.
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+
+    TokenPayload:
+      type: object
+      required: [access_token, token_type, expires_in, user, tenant, must_change_password]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, description: Seconds, example: 900 }
+        refresh_token:
+          type: string
+          description: Omitted when a password change is forced.
+        refresh_expires_in: { type: integer, example: 2592000 }
+        user: { $ref: "#/components/schemas/UserSummary" }
+        tenant: { $ref: "#/components/schemas/TenantSummary" }
+        must_change_password:
+          type: boolean
+          description: |
+            When true, the access token is restricted to the password change
+            endpoint and no refresh token is issued.
+
+    TenantChoice:
+      type: object
+      required: [tenant_required, tenants]
+      properties:
+        tenant_required: { type: boolean, const: true }
+        tenants:
+          type: array
+          items: { $ref: "#/components/schemas/TenantSummary" }
+
+    ServiceToken:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, example: 300 }
+
+    UserSummary:
+      type: object
+      required: [id, display_name]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+        email: { type: string, format: email }
+
+    TenantSummary:
+      type: object
+      required: [id, slug, name]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [active, suspended] }
+
+    Tenant:
+      type: object
+      required: [id, slug, name, status, version, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [active, suspended] }
+        member_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        version: { type: integer }
+
+    Me:
+      type: object
+      required: [id, email, display_name, email_verified, is_super_admin, tenant, roles, permissions, providers]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        email_verified: { type: boolean }
+        is_super_admin: { type: boolean }
+        tenant: { $ref: "#/components/schemas/TenantSummary" }
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          description: Effective permissions; the frontend hides what the user cannot do.
+          items: { type: string }
+        providers: { $ref: "#/components/schemas/Providers" }
+
+    Providers:
+      type: object
+      required: [password, google]
+      properties:
+        password: { type: boolean }
+        google: { type: boolean }
+
+    Session:
+      type: object
+      required: [id, created_at, current]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The family ID; deleting it signs that device out.
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time }
+        user_agent: { type: string }
+        ip: { type: string }
+        current: { type: boolean }
+
+    InvitePreview:
+      type: object
+      required: [tenant, email_masked, has_password]
+      properties:
+        tenant:
+          type: object
+          properties:
+            name: { type: string }
+        email_masked: { type: string, example: b**@example.com }
+        has_password:
+          type: boolean
+          description: False means the accept form must ask for a password.
+
+    AdminUser:
+      type: object
+      required: [id, email, display_name, status, membership_status, roles, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        status: { type: string, enum: [pending, active, disabled] }
+        membership_status: { type: string, enum: [invited, active, removed] }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/RoleRef" }
+        created_at: { type: string, format: date-time }
+        last_sign_in_at: { type: string, format: date-time }
+
+    AdminUserDetail:
+      allOf:
+        - $ref: "#/components/schemas/AdminUser"
+        - type: object
+          required: [providers, version]
+          properties:
+            providers: { $ref: "#/components/schemas/Providers" }
+            version: { type: integer }
+
+    RoleRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+
+    RoleSummary:
+      type: object
+      required: [id, name, is_system, permission_count, user_count, version]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        is_system: { type: boolean }
+        permission_count: { type: integer }
+        user_count: { type: integer }
+        version: { type: integer }
+
+    Role:
+      type: object
+      required: [id, name, is_system, permissions, version]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        is_system:
+          type: boolean
+          description: System roles cannot be edited or deleted.
+        permissions:
+          type: array
+          items: { type: string }
+        version: { type: integer }
+
+    Permission:
+      type: object
+      required: [key, description, is_system]
+      properties:
+        key:
+          type: string
+          description: A resource and action, with an optional any scope.
+          example: notes:read:any
+        description: { type: string }
+        is_system: { type: boolean }
+
+    AuditEntry:
+      type: object
+      required: [id, at, action]
+      properties:
+        id: { type: integer, format: int64 }
+        at: { type: string, format: date-time }
+        actor:
+          type: object
+          description: Absent for anonymous events such as a failed sign-in.
+          properties:
+            id: { type: string, format: uuid }
+            display_name: { type: string }
+        action: { type: string, example: role.update }
+        target_type: { type: string }
+        target_id: { type: string }
+        before: { type: object, additionalProperties: true }
+        after: { type: object, additionalProperties: true }
+        ip: { type: string }
+        request_id: { type: string }
+
+    RolePermissionMap:
+      type: object
+      required: [tenant_id, roles]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        roles:
+          type: object
+          description: Role name to permission keys. A role with no grants is an empty list.
+          additionalProperties:
+            type: array
+            items: { type: string }
+        version: { type: integer }

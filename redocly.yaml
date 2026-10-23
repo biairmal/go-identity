@@ -1,0 +1,29 @@
+# Lint configuration for api/openapi.yaml. Run it with:
+#   make openapi-lint
+#
+# The rules turned off below are switched off deliberately, because the
+# behaviour they object to is what TRD section 9 specifies. Everything else
+# stays at the recommended level, so a genuine mistake still fails the build.
+extends:
+  - recommended
+
+rules:
+  # The OAuth routes answer 302 and nothing else: /v1/auth/google/start and
+  # /v1/auth/google/callback redirect to Google and back to the frontend. A
+  # 2xx would mean the redirect never happened.
+  operation-2xx-response: off
+
+  # Some operations have no 4xx by design:
+  #   - /healthz, /version, /v1/auth/config and the JWKS endpoint are public
+  #     and take no input, so there is nothing to reject.
+  #   - /readyz answers 503, not a 4xx, because an unready pod is a server
+  #     condition and the load balancer must act on it.
+  #   - logout and logout-all are idempotent on purpose (TRD 9.4): an already
+  #     invalid token still returns 204, so a client cannot be left holding a
+  #     token it is unable to discard.
+  operation-4xx-response: off
+
+  # The only example.com in this file is a masked email address
+  # (b**@example.com), not a server URL. RFC 2606 reserves example.com for
+  # exactly this. The servers block points at localhost.
+  no-server-example.com: off

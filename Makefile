@@ -5,7 +5,7 @@ COVERAGE_OUT := out/coverage.out
 
 .DEFAULT_GOAL := help
 .PHONY: help up down run test test-integration lint format format-check coverage vulncheck check \
-	migrate-up migrate-down migrate-create keys
+	migrate-up migrate-down migrate-create keys openapi-lint openapi-mock
 
 help: ## Show targets
 	@grep -E "^[a-z-]+:.*## " Makefile | sed -e "s/:.*## /\t/"
@@ -44,6 +44,12 @@ coverage: ## Unit-test coverage into out/
 
 vulncheck: ## govulncheck
 	govulncheck ./...
+
+openapi-lint: ## Validate api/openapi.yaml (needs npx)
+	npx --yes @redocly/cli@latest lint api/openapi.yaml
+
+openapi-mock: ## Serve api/openapi.yaml as a mock on :4010 (needs npx)
+	npx --yes @stoplight/prism-cli@latest mock api/openapi.yaml -p 4010
 
 check: format-check lint test coverage vulncheck ## CI gate: format, lint, unit tests, coverage, vulncheck
 
