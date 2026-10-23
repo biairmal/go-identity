@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/biairmal/go-identity/internal/module/audit"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
 	"github.com/biairmal/go-sdk/lib/authz"
@@ -27,6 +28,14 @@ type Module interface {
 }
 
 // buildModules constructs every module. Adding a module adds one entry here.
-func buildModules(_ *Config, _ Deps) ([]Module, error) {
-	return nil, nil
+// The order is the one modules are registered in, not a dependency order:
+// modules never depend on each other directly, only through ports.
+//
+// a resource (the signing keys in T2.6) fail here, and the caller already
+// handles it.
+//
+//nolint:unparam // the error is part of the contract: modules whose New opens
+func buildModules(_ *Config, deps Deps) ([]Module, error) {
+	auditModule := audit.New(audit.Deps{DB: deps.DB, Log: deps.Log})
+	return []Module{auditModule}, nil
 }

@@ -77,7 +77,12 @@ type HTTPConfig struct {
 	Addr              string        `mapstructure:"addr"`
 	ReadHeaderTimeout time.Duration `mapstructure:"read_header_timeout"`
 	MaxBodyBytes      int64         `mapstructure:"max_body_bytes"`
-	CORS              CORSConfig    `mapstructure:"cors"`
+	// TrustProxy reads the caller's IP from X-Forwarded-For. Turn it on
+	// only behind a proxy that sets the header, because a direct client can
+	// forge it. The address is used for audit rows and rate-limit keys,
+	// never for an authorisation decision.
+	TrustProxy bool       `mapstructure:"trust_proxy"`
+	CORS       CORSConfig `mapstructure:"cors"`
 }
 
 // CORSConfig lists the browser origins allowed to call the API.
