@@ -1,0 +1,202 @@
+== TABLES AND COLUMNS ==
+audit_log.id bigint NOT NULL GENERATED ALWAYS AS IDENTITY
+audit_log.at timestamp with time zone NOT NULL DEFAULT now()
+audit_log.tenant_id uuid
+audit_log.actor_id uuid
+audit_log.action text NOT NULL
+audit_log.target_type text NOT NULL DEFAULT ''::text
+audit_log.target_id text NOT NULL DEFAULT ''::text
+audit_log.before jsonb
+audit_log.after jsonb
+audit_log.ip inet
+audit_log.request_id text NOT NULL DEFAULT ''::text
+credentials.user_id uuid NOT NULL
+credentials.password_hash text NOT NULL
+credentials.updated_at timestamp with time zone NOT NULL DEFAULT now()
+identities.id uuid NOT NULL DEFAULT gen_random_uuid()
+identities.user_id uuid NOT NULL
+identities.provider text NOT NULL
+identities.provider_subject text NOT NULL
+identities.email_at_link bytea
+identities.linked_at timestamp with time zone NOT NULL DEFAULT now()
+oauth_states.state_hash bytea NOT NULL
+oauth_states.code_verifier text NOT NULL
+oauth_states.nonce text NOT NULL
+oauth_states.redirect_to text NOT NULL
+oauth_states.tenant_slug text
+oauth_states.expires_at timestamp with time zone NOT NULL
+one_time_tokens.id uuid NOT NULL DEFAULT gen_random_uuid()
+one_time_tokens.user_id uuid NOT NULL
+one_time_tokens.tenant_id uuid
+one_time_tokens.purpose text NOT NULL
+one_time_tokens.token_hash bytea NOT NULL
+one_time_tokens.payload jsonb NOT NULL DEFAULT '{}'::jsonb
+one_time_tokens.expires_at timestamp with time zone NOT NULL
+one_time_tokens.used_at timestamp with time zone
+one_time_tokens.created_at timestamp with time zone NOT NULL DEFAULT now()
+outbox.id bigint NOT NULL GENERATED ALWAYS AS IDENTITY
+outbox.topic text NOT NULL
+outbox.key text NOT NULL DEFAULT ''::text
+outbox.payload jsonb NOT NULL
+outbox.created_at timestamp with time zone NOT NULL DEFAULT now()
+outbox.sent_at timestamp with time zone
+outbox.attempts integer NOT NULL DEFAULT 0
+outbox.last_error text NOT NULL DEFAULT ''::text
+permissions.key text NOT NULL
+permissions.description text NOT NULL DEFAULT ''::text
+permissions.is_system boolean NOT NULL DEFAULT false
+refresh_tokens.id uuid NOT NULL DEFAULT gen_random_uuid()
+refresh_tokens.family_id uuid NOT NULL
+refresh_tokens.user_id uuid NOT NULL
+refresh_tokens.tenant_id uuid NOT NULL
+refresh_tokens.token_hash bytea NOT NULL
+refresh_tokens.issued_at timestamp with time zone NOT NULL DEFAULT now()
+refresh_tokens.expires_at timestamp with time zone NOT NULL
+refresh_tokens.absolute_expires_at timestamp with time zone NOT NULL
+refresh_tokens.rotated_at timestamp with time zone
+refresh_tokens.revoked_at timestamp with time zone
+refresh_tokens.user_agent text NOT NULL DEFAULT ''::text
+refresh_tokens.ip inet
+role_permissions.role_id uuid NOT NULL
+role_permissions.permission_key text NOT NULL
+roles.id uuid NOT NULL DEFAULT gen_random_uuid()
+roles.tenant_id uuid
+roles.name text NOT NULL
+roles.description text NOT NULL DEFAULT ''::text
+roles.is_system boolean NOT NULL DEFAULT false
+roles.version integer NOT NULL DEFAULT 1
+roles.created_at timestamp with time zone NOT NULL DEFAULT now()
+roles.updated_at timestamp with time zone NOT NULL DEFAULT now()
+signing_keys.kid text NOT NULL
+signing_keys.public_jwk jsonb NOT NULL
+signing_keys.status text NOT NULL
+signing_keys.activated_at timestamp with time zone
+signing_keys.updated_at timestamp with time zone NOT NULL DEFAULT now()
+tenant_members.tenant_id uuid NOT NULL
+tenant_members.user_id uuid NOT NULL
+tenant_members.status text NOT NULL DEFAULT 'active'::text
+tenant_members.joined_at timestamp with time zone
+tenant_members.created_at timestamp with time zone NOT NULL DEFAULT now()
+tenants.id uuid NOT NULL DEFAULT gen_random_uuid()
+tenants.slug text NOT NULL
+tenants.name text NOT NULL
+tenants.status text NOT NULL DEFAULT 'active'::text
+tenants.version integer NOT NULL DEFAULT 1
+tenants.created_at timestamp with time zone NOT NULL DEFAULT now()
+tenants.updated_at timestamp with time zone NOT NULL DEFAULT now()
+user_roles.tenant_id uuid NOT NULL
+user_roles.user_id uuid NOT NULL
+user_roles.role_id uuid NOT NULL
+user_roles.granted_by uuid
+user_roles.granted_at timestamp with time zone NOT NULL DEFAULT now()
+users.id uuid NOT NULL DEFAULT gen_random_uuid()
+users.email_enc bytea NOT NULL
+users.email_hash bytea NOT NULL
+users.email_verified_at timestamp with time zone
+users.display_name text NOT NULL DEFAULT ''::text
+users.status text NOT NULL DEFAULT 'pending'::text
+users.is_super_admin boolean NOT NULL DEFAULT false
+users.must_change_password boolean NOT NULL DEFAULT false
+users.failed_logins integer NOT NULL DEFAULT 0
+users.locked_until timestamp with time zone
+users.last_sign_in_at timestamp with time zone
+users.version integer NOT NULL DEFAULT 1
+users.created_at timestamp with time zone NOT NULL DEFAULT now()
+users.updated_at timestamp with time zone NOT NULL DEFAULT now()
+
+== CONSTRAINTS ==
+audit_log audit_log_pkey PRIMARY KEY (id)
+credentials credentials_pkey PRIMARY KEY (user_id)
+credentials credentials_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+identities identities_pkey PRIMARY KEY (id)
+identities identities_provider_check CHECK ((provider = 'google'::text))
+identities identities_provider_provider_subject_key UNIQUE (provider, provider_subject)
+identities identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+oauth_states oauth_states_pkey PRIMARY KEY (state_hash)
+one_time_tokens one_time_tokens_pkey PRIMARY KEY (id)
+one_time_tokens one_time_tokens_purpose_check CHECK ((purpose = ANY (ARRAY['verify_email'::text, 'reset_password'::text, 'invite'::text, 'oauth_exchange'::text])))
+one_time_tokens one_time_tokens_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+one_time_tokens one_time_tokens_token_hash_key UNIQUE (token_hash)
+one_time_tokens one_time_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+outbox outbox_pkey PRIMARY KEY (id)
+permissions permissions_key_check CHECK ((key ~ '^[a-z0-9_-]+(:[a-z0-9_-]+){1,2}$'::text))
+permissions permissions_pkey PRIMARY KEY (key)
+refresh_tokens refresh_tokens_pkey PRIMARY KEY (id)
+refresh_tokens refresh_tokens_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+refresh_tokens refresh_tokens_token_hash_key UNIQUE (token_hash)
+refresh_tokens refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+role_permissions role_permissions_permission_key_fkey FOREIGN KEY (permission_key) REFERENCES permissions(key)
+role_permissions role_permissions_pkey PRIMARY KEY (role_id, permission_key)
+role_permissions role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+roles roles_id_tenant_id_key UNIQUE (id, tenant_id)
+roles roles_pkey PRIMARY KEY (id)
+roles roles_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+signing_keys signing_keys_pkey PRIMARY KEY (kid)
+signing_keys signing_keys_status_check CHECK ((status = ANY (ARRAY['next'::text, 'active'::text, 'retiring'::text, 'retired'::text])))
+tenant_members tenant_members_pkey PRIMARY KEY (tenant_id, user_id)
+tenant_members tenant_members_status_check CHECK ((status = ANY (ARRAY['invited'::text, 'active'::text, 'removed'::text])))
+tenant_members tenant_members_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+tenant_members tenant_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+tenants tenants_pkey PRIMARY KEY (id)
+tenants tenants_slug_check CHECK ((slug ~ '^[a-z0-9][a-z0-9-]{1,62}$'::text))
+tenants tenants_slug_key UNIQUE (slug)
+tenants tenants_status_check CHECK ((status = ANY (ARRAY['active'::text, 'suspended'::text])))
+user_roles user_roles_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES users(id)
+user_roles user_roles_pkey PRIMARY KEY (tenant_id, user_id, role_id)
+user_roles user_roles_role_id_tenant_id_fkey FOREIGN KEY (role_id, tenant_id) REFERENCES roles(id, tenant_id) ON DELETE CASCADE
+user_roles user_roles_tenant_id_user_id_fkey FOREIGN KEY (tenant_id, user_id) REFERENCES tenant_members(tenant_id, user_id)
+user_roles user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+users users_email_hash_key UNIQUE (email_hash)
+users users_pkey PRIMARY KEY (id)
+users users_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'disabled'::text])))
+
+== INDEXES ==
+CREATE INDEX audit_log_actor_at ON identity.audit_log USING btree (actor_id, at DESC)
+CREATE UNIQUE INDEX audit_log_pkey ON identity.audit_log USING btree (id)
+CREATE INDEX audit_log_tenant_at ON identity.audit_log USING btree (tenant_id, at DESC)
+CREATE UNIQUE INDEX credentials_pkey ON identity.credentials USING btree (user_id)
+CREATE UNIQUE INDEX identities_pkey ON identity.identities USING btree (id)
+CREATE UNIQUE INDEX identities_provider_provider_subject_key ON identity.identities USING btree (provider, provider_subject)
+CREATE INDEX identities_user ON identity.identities USING btree (user_id)
+CREATE UNIQUE INDEX oauth_states_pkey ON identity.oauth_states USING btree (state_hash)
+CREATE UNIQUE INDEX one_time_tokens_pkey ON identity.one_time_tokens USING btree (id)
+CREATE UNIQUE INDEX one_time_tokens_token_hash_key ON identity.one_time_tokens USING btree (token_hash)
+CREATE UNIQUE INDEX outbox_pkey ON identity.outbox USING btree (id)
+CREATE INDEX outbox_unsent ON identity.outbox USING btree (created_at) WHERE (sent_at IS NULL)
+CREATE UNIQUE INDEX permissions_pkey ON identity.permissions USING btree (key)
+CREATE INDEX refresh_tokens_family ON identity.refresh_tokens USING btree (family_id)
+CREATE UNIQUE INDEX refresh_tokens_pkey ON identity.refresh_tokens USING btree (id)
+CREATE UNIQUE INDEX refresh_tokens_token_hash_key ON identity.refresh_tokens USING btree (token_hash)
+CREATE INDEX refresh_tokens_user ON identity.refresh_tokens USING btree (user_id) WHERE (revoked_at IS NULL)
+CREATE UNIQUE INDEX role_permissions_pkey ON identity.role_permissions USING btree (role_id, permission_key)
+CREATE UNIQUE INDEX roles_id_tenant_id_key ON identity.roles USING btree (id, tenant_id)
+CREATE UNIQUE INDEX roles_name_per_tenant ON identity.roles USING btree (tenant_id, lower(name)) WHERE (tenant_id IS NOT NULL)
+CREATE UNIQUE INDEX roles_name_template ON identity.roles USING btree (lower(name)) WHERE (tenant_id IS NULL)
+CREATE UNIQUE INDEX roles_pkey ON identity.roles USING btree (id)
+CREATE UNIQUE INDEX signing_keys_pkey ON identity.signing_keys USING btree (kid)
+CREATE UNIQUE INDEX tenant_members_pkey ON identity.tenant_members USING btree (tenant_id, user_id)
+CREATE INDEX tenant_members_user ON identity.tenant_members USING btree (user_id)
+CREATE UNIQUE INDEX tenants_pkey ON identity.tenants USING btree (id)
+CREATE UNIQUE INDEX tenants_slug_key ON identity.tenants USING btree (slug)
+CREATE UNIQUE INDEX user_roles_pkey ON identity.user_roles USING btree (tenant_id, user_id, role_id)
+CREATE INDEX user_roles_role ON identity.user_roles USING btree (role_id)
+CREATE UNIQUE INDEX users_email_hash_key ON identity.users USING btree (email_hash)
+CREATE UNIQUE INDEX users_one_super_admin ON identity.users USING btree (is_super_admin) WHERE is_super_admin
+CREATE UNIQUE INDEX users_pkey ON identity.users USING btree (id)
+
+== PRIVILEGES ==
+audit_log identity: INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE
+credentials identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+identities identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+oauth_states identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+one_time_tokens identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+outbox identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+permissions identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+refresh_tokens identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+role_permissions identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+roles identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+signing_keys identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+tenant_members identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+tenants identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+user_roles identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+users identity: DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
