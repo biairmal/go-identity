@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/biairmal/go-sdk v0.1.0
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/prometheus/client_golang v1.21.1
 )
