@@ -18,3 +18,6 @@ Choices made where the TRD was silent or unclear. One line each: `date Â· task Â
 | 2026-10-22 | T0.3 | No `testkit/fixtures.go` yet | There are no business tables to seed; the tasks that add users and roles add their fixtures |
 | 2026-10-22 | T0.3 | `testkit.Server` takes an `http.Handler` (`app.Handler()`) | Keeps `internal/platform` free of an `internal/app` import |
 | 2026-10-22 | T0.3 | The app owns its Prometheus registry | The global default registry rejects a second app in the same process (tests, mounted mode) |
+| 2026-10-22 | T0.4 | `listquery` rejects unknown query keys; endpoints list extra keys in `AllowedParams` | The plan wants an unknown filter to be a 400; the ported parser silently ignored it |
+| 2026-10-22 | T0.4 | `listquery` takes `*ListParseConfig` | The added field makes the struct large enough for the `hugeParam` lint |
+| 2026-10-22 | T0.4 | A missing or malformed tenant claim is a 401 in `scope.Tenant` | Without a tenant the caller is not authenticated for tenant data; 500 would hide misconfigured tokens |
