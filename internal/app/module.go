@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-sdk/lib/authz"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
@@ -11,10 +12,11 @@ import (
 
 // Deps are the shared dependencies handed to every module's New.
 type Deps struct {
-	DB    *sqlkit.DB
-	Log   logger.Logger
-	V     validator.Validator
-	Authz authz.Authorizer
+	DB     *sqlkit.DB
+	Log    logger.Logger
+	V      validator.Validator
+	Authz  authz.Authorizer
+	Outbox *database.Outbox
 }
 
 // Module is a feature boundary. internal/app only sees this: it builds each
