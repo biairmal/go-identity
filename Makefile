@@ -5,7 +5,7 @@ COVERAGE_OUT := out/coverage.out
 
 .DEFAULT_GOAL := help
 .PHONY: help up down run test test-integration lint format format-check coverage vulncheck check \
-	migrate-up migrate-down migrate-create
+	migrate-up migrate-down migrate-create keys
 
 help: ## Show targets
 	@grep -E "^[a-z-]+:.*## " Makefile | sed -e "s/:.*## /\t/"
@@ -16,8 +16,11 @@ up: ## Start the local stack (Postgres)
 down: ## Stop the local stack
 	$(COMPOSE) down
 
-run: ## Run the API against the local stack
-	go run ./cmd/server serve
+keys: ## Generate a local signing key (development only; real envs mount a secret)
+	bash scripts/gen-dev-keys.sh ./keys
+
+run: keys ## Run the API against the local stack
+	SIGNING_KEYS_DIR=./keys go run ./cmd/server serve
 
 test: ## Unit tests
 	go test -short ./...

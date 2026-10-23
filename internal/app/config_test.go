@@ -3,6 +3,8 @@ package app
 import (
 	"strings"
 	"testing"
+
+	"github.com/biairmal/go-identity/internal/platform/testkit"
 )
 
 func validConfig(t *testing.T) Config {
@@ -11,6 +13,10 @@ func validConfig(t *testing.T) Config {
 	if err != nil {
 		t.Fatalf("default config.yaml must be valid: %v", err)
 	}
+	// The shipped default points at the mounted secret path, which does not
+	// exist in a test. Point it at generated keys instead, so building the
+	// app in a test loads a real key set.
+	cfg.Modules.Auth.Token.SigningKeysDir = testkit.SigningKeys(t, "test-key")
 	return cfg
 }
 

@@ -76,7 +76,11 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: authz.NewNoOp(),
 		Outbox: database.NewOutbox(db),
 	}
-	modules, svc := buildModules(&a.cfg, deps)
+	modules, svc, err := buildModules(&a.cfg, deps)
+	if err != nil {
+		a.close(ctx)
+		return nil, err
+	}
 	if err := a.bootstrap(ctx, svc); err != nil {
 		a.close(ctx)
 		return nil, err
