@@ -7,8 +7,10 @@ import (
 	"github.com/biairmal/go-sdk/lib/validator"
 
 	"github.com/biairmal/go-identity/internal/module/audit"
+	identityauth "github.com/biairmal/go-identity/internal/module/auth"
 	"github.com/biairmal/go-identity/internal/module/rbac"
 	"github.com/biairmal/go-identity/internal/module/tenant"
+	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
 )
@@ -36,13 +38,14 @@ type Module interface {
 type services struct {
 	tenant *tenant.Service
 	rbac   *rbac.Service
+	auth   *identityauth.Module
 }
 
 // buildModules constructs every module and returns them together with the
 // services internal/app needs afterwards. Adding a module adds one entry
 // here. The order is the one modules are registered in, not a dependency
 // order: modules never depend on each other directly, only through ports.
-func buildModules(cfg *Config, deps Deps) ([]Module, *services) {
+func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 	auditModule := audit.New(audit.Deps{DB: deps.DB, Log: deps.Log})
 
 	tenantModule := tenant.New(cfg.Modules.Tenant, tenant.Deps{
@@ -57,9 +60,21 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services) {
 		Audit: rbacAudit{w: auditModule.Writer()},
 	})
 
-	modules := []Module{auditModule, tenantModule, rbacModule}
+	// auth loads the signing keys, so it is the one module whose New can
+	// fail: a service that cannot sign a token must not start.
+	authModule, err := identityauth.New(&cfg.Modules.Auth, identityauth.Deps{
+		DB:    deps.DB,
+		Log:   deps.Log,
+		Clock: clock.System{},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	modules := []Module{auditModule, tenantModule, rbacModule, authModule}
 	return modules, &services{
 		tenant: tenantModule.Service(),
 		rbac:   rbacModule.Service(),
-	}
+		auth:   authModule,
+	}, nil
 }

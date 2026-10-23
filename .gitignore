@@ -8,6 +8,9 @@ out/
 # Local env (copy from .env.example)
 .env
 
+# Local signing keys from `make keys`; real environments mount a secret
+/keys/
+
 # Local Go workspace used to develop against an unreleased go-sdk
 go.work
 go.work.sum

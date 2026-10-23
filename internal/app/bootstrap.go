@@ -21,6 +21,9 @@ func (a *App) bootstrap(ctx context.Context, svc *services) error {
 		if err := svc.rbac.SyncCatalog(ctx); err != nil {
 			return err
 		}
+		if err := svc.auth.SyncKeys(ctx); err != nil {
+			return err
+		}
 		if _, err := svc.tenant.EnsureDefault(ctx); err != nil {
 			return err
 		}
