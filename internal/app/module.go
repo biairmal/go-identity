@@ -7,6 +7,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/validator"
 
 	"github.com/biairmal/go-identity/internal/module/audit"
+	"github.com/biairmal/go-identity/internal/module/rbac"
 	"github.com/biairmal/go-identity/internal/module/tenant"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
@@ -34,6 +35,7 @@ type Module interface {
 // roles and the super admin.
 type services struct {
 	tenant *tenant.Service
+	rbac   *rbac.Service
 }
 
 // buildModules constructs every module and returns them together with the
@@ -49,6 +51,15 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services) {
 		Audit: tenantAudit{w: auditModule.Writer()},
 	})
 
-	modules := []Module{auditModule, tenantModule}
-	return modules, &services{tenant: tenantModule.Service()}
+	rbacModule := rbac.New(cfg.Modules.RBAC, rbac.Deps{
+		DB:    deps.DB,
+		Log:   deps.Log,
+		Audit: rbacAudit{w: auditModule.Writer()},
+	})
+
+	modules := []Module{auditModule, tenantModule, rbacModule}
+	return modules, &services{
+		tenant: tenantModule.Service(),
+		rbac:   rbacModule.Service(),
+	}
 }
