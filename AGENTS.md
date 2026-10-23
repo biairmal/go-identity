@@ -45,8 +45,10 @@ make help
 - Layers inside a module: `handler` → `service` → `repository`. No upward imports.
 - Modules: `module.go` with `New(cfg, Deps)` and `Register(rt *httpx.Routes)`. A module mounts its routes into every
   group it serves (`rt.API`, `rt.Me`, `rt.Admin`, `rt.Internal`, `rt.Root`) and never creates a group; group
-  middleware lives in `internal/app/routes.go`. Each module's `Config` has `Default()` and
-  `Validate()` and is one row in the validation table in `internal/app/config.go`.
+  middleware lives in `internal/app/routes.go`. Each module's `Config` lives under the YAML key
+  `modules.<name>`, has `Default()` and `Validate()`, and is one row in the validation table in
+  `internal/app/config.go`. A setting belongs to the module that reads it; `internal/app` validates only rules
+  that span modules.
 - **No module imports another.** Declare a small port in the consumer and wire an adapter in `internal/app`.
   The architecture test `internal/app/arch_test.go` (in `make test`) enforces it, and keeps `platform` from
   importing `app` or a module.
