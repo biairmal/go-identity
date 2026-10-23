@@ -99,7 +99,7 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 	if authMW != nil {
 		chain = append(chain, authMW)
 	}
-	a.handler = middleware.Chain(a.routes(modules), chain...)
+	a.handler = a.routes(modules, chain)
 	return a, nil
 }
 

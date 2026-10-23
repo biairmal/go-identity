@@ -7,7 +7,7 @@ Copy-paste examples for the rules in [AGENTS.md](../AGENTS.md).
 1. Create `internal/<module>/` with `module.go`, `config.go`, `model.go`, `dto.go`, `repository.go`,
    `service.go`, `handler.go`.
 2. `module.go` exposes `New(cfg Config, deps app-provided values) (*Module, error)` and
-   `Register(mux *http.ServeMux)`.
+   `Register(r chi.Router)`.
 3. Add the module's config block to `app.Config` and one row to `Config.sections()` in
    `internal/app/config.go`.
 4. Add one line to `buildModules` in `internal/app/module.go`.
@@ -137,7 +137,7 @@ Mount every route through `httpx.Handle` (go-sdk `handler.Handle` plus `Retry-Af
 custom `code`:
 
 ```go
-mux.Handle("PATCH /v1/admin/roles/{id}", httpx.Handle(h.updateRole))
+r.Patch("/v1/admin/roles/{id}", httpx.Handle(h.updateRole)) // path params: chi.URLParam(r, "id")
 
 func (h *Handler) updateRole(r *http.Request) (any, error) {
     var in UpdateRoleRequest
