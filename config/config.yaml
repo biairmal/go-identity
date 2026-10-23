@@ -11,6 +11,7 @@ http:
   addr: ${HTTP_ADDR::8080}
   read_header_timeout: 10s
   max_body_bytes: 1048576                     # 1 MiB request limit
+  trust_proxy: ${TRUST_PROXY:false}           # true only behind a proxy that sets X-Forwarded-For
   cors:
     allowed_origins: [${CORS_ORIGINS:http://localhost:3000}]
 

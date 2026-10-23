@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/requestip"
 	"github.com/biairmal/go-identity/migrations"
 )
 
@@ -108,6 +109,7 @@ func middlewareChain(
 		middleware.Logging(log, &middleware.LoggingOptions{LogResponse: true}),
 		cors(cfg.HTTP.CORS),
 		maxBody(cfg.HTTP.MaxBodyBytes),
+		requestip.Middleware(cfg.HTTP.TrustProxy),
 	}
 }
 
