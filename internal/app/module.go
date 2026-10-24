@@ -35,14 +35,15 @@ type Module interface {
 }
 
 // services are the module services internal/app itself needs, for the startup
-// steps that span modules: ensuring the default tenant now, and later seeding
-// roles and the super admin.
+// steps that span modules (the default tenant, role seeding, the super admin)
+// and for the super admin CLI.
 type services struct {
-	tenant  *tenant.Service
-	rbac    *rbac.Service
-	auth    *identityauth.Module
-	session *session.Service
-	user    *user.Service
+	tenant      *tenant.Service
+	rbac        *rbac.Service
+	auth        *identityauth.Module
+	session     *session.Service
+	user        *user.Service
+	superAdmins *user.SuperAdmins
 }
 
 // buildModules constructs every module and returns them together with the
@@ -81,24 +82,18 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 		Clock: clock.System{},
 	})
 
-	// The email cipher is built here, not inside user: the module declares
-	// the port and app owns the go-sdk crypto adapter behind it.
-	cipher, err := newEmailCipher(cfg, deps.Log)
+	userModule, err := newUserModule(cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service())
 	if err != nil {
 		return nil, nil, err
 	}
-	userModule := user.New(cfg.Modules.User, user.Deps{
-		DB:          deps.DB,
-		Log:         deps.Log,
-		EmailCipher: cipher,
-	})
 
 	modules := []Module{auditModule, tenantModule, rbacModule, authModule, sessionModule, userModule}
 	return modules, &services{
-		tenant:  tenantModule.Service(),
-		rbac:    rbacModule.Service(),
-		auth:    authModule,
-		session: sessionModule.Service(),
-		user:    userModule.Service(),
+		tenant:      tenantModule.Service(),
+		rbac:        rbacModule.Service(),
+		auth:        authModule,
+		session:     sessionModule.Service(),
+		user:        userModule.Service(),
+		superAdmins: userModule.SuperAdmins(),
 	}, nil
 }

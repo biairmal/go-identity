@@ -21,6 +21,8 @@ curl localhost:8080/readyz
 | `server serve` | HTTP API (default) |
 | `server worker` | Background runner |
 | `server migrate up\|down\|status\|create <name>` | Database migrations |
+| `server superadmin reset --email <e>` | New temporary super admin password (printed once), forced change, sessions revoked |
+| `server superadmin transfer --to <e>` | Move the super admin flag to another active account |
 
 `make help` lists the Makefile targets. `make check` is the CI gate.
 

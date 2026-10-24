@@ -19,6 +19,7 @@ func newTestApp(t *testing.T) *App {
 	cfg.Database = testkit.PostgresConfig(t)
 	cfg.HTTP.Addr = "127.0.0.1:0"
 	cfg.Lifecycle.DrainDelay = 300 * time.Millisecond
+	cfg.Modules.User.SuperAdmin = testSuperAdmin
 	a, err := New(context.Background(), &cfg, logger.NewNoOp())
 	if err != nil {
 		t.Fatalf("New: %v", err)
