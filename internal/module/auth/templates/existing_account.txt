@@ -1,0 +1,11 @@
+You already have an account
+
+Someone tried to register with this email address, which already has an
+account. No new account was created and nothing has changed.
+
+If that was you, sign in instead:
+
+{{.Link}}
+
+If you have forgotten your password, use the "Forgot password" link on that
+page.

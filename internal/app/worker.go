@@ -13,12 +13,24 @@ import (
 	"github.com/biairmal/go-identity/internal/platform/cleanup"
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/mail"
 )
 
 // senders maps outbox topics to their Sender. Modules that enqueue a topic
 // add its sender here.
-func senders(_ *Config, _ logger.Logger) map[string]database.Sender {
-	return map[string]database.Sender{}
+//
+// Until a real mailer lands, mail is delivered by the development logging
+// mailer, which refuses to be built in production: a worker there would print
+// one-time tokens to its logs instead of emailing them, so it must fail
+// loudly rather than start.
+func senders(cfg *Config, log logger.Logger, db *sqlkit.DB) (map[string]database.Sender, error) {
+	mailer, err := mail.NewLogging(log, cfg.Service.Environment, cfg.Modules.Auth.EmailBaseURL())
+	if err != nil {
+		return nil, err
+	}
+	return map[string]database.Sender{
+		mail.Topic: mail.NewSender(mailer, db),
+	}, nil
 }
 
 // RunWorker runs the background jobs (the outbox dispatcher and the cleanup
@@ -39,6 +51,10 @@ func RunWorker(ctx context.Context, cfg *Config, log logger.Logger) error {
 	if err := checkSchema(ctx, db); err != nil {
 		return err
 	}
+	topics, err := senders(cfg, log, db)
+	if err != nil {
+		return err
+	}
 
 	log.Info("worker started")
 
@@ -46,7 +62,7 @@ func RunWorker(ctx context.Context, cfg *Config, log logger.Logger) error {
 	// side by side; the first to fail stops the worker.
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
-		return database.NewDispatcher(db, senders(cfg, log), log).Run(ctx)
+		return database.NewDispatcher(db, topics, log).Run(ctx)
 	})
 	group.Go(func() error {
 		return cleanup.New(db, clock.System{}, log).Run(ctx, cleanup.DefaultInterval)

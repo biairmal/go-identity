@@ -1,0 +1,10 @@
+Confirm your email address
+
+Welcome{{with .DisplayName}} {{.}}{{end}}.
+
+Open this link to confirm your email address and activate your account:
+
+{{.Link}}
+
+The link can be used once and expires in 24 hours. If you did not create an
+account, you can ignore this message.
