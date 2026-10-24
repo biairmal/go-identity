@@ -26,6 +26,10 @@ const (
 	ClaimScope      = "scope"
 )
 
+// ScopePasswordChange restricts a token to choosing a new password. It is
+// issued at sign-in while a password change is forced.
+const ScopePasswordChange = "password_change"
+
 // Claims modes, mirroring modules.auth.token.claims.
 const (
 	ClaimsRoles               = "roles"
@@ -46,6 +50,9 @@ type Subject struct {
 	// Scope restricts a token to one purpose, such as a password change
 	// after a forced reset. Empty means a full token.
 	Scope string
+	// TTL overrides the configured access-token lifetime when positive,
+	// e.g. for a short-lived restricted token.
+	TTL time.Duration
 }
 
 // Config is what the builder needs from modules.auth.token.
@@ -88,7 +95,11 @@ func NewBuilder(cfg Config, set *identitykeys.Set, clk clock.Clock) (*Builder, e
 // tenant is always present: in single mode it is the default tenant.
 func (b *Builder) Access(_ context.Context, s *Subject, tenantID uuid.UUID) (string, time.Time, error) {
 	now := b.clock.Now()
-	expiry := now.Add(b.cfg.AccessTTL)
+	ttl := b.cfg.AccessTTL
+	if s.TTL > 0 {
+		ttl = s.TTL
+	}
+	expiry := now.Add(ttl)
 
 	extra := map[string]any{
 		ClaimTenant:  tenantID.String(),
@@ -105,7 +116,7 @@ func (b *Builder) Access(_ context.Context, s *Subject, tenantID uuid.UUID) (str
 	}
 
 	opts := []auth.IssueOption{
-		auth.WithTTL(b.cfg.AccessTTL),
+		auth.WithTTL(ttl),
 		auth.WithIssuedAt(now),
 		auth.WithRoles(s.Roles...),
 		auth.WithExtraClaims(extra),

@@ -57,3 +57,48 @@ type AcceptedResponse struct {
 
 // accepted is the one AcceptedResponse the sign-up flows return.
 var accepted = AcceptedResponse{Status: "accepted"}
+
+// LoginRequest is the body of POST /v1/auth/login.
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email,max=254"`
+	Password string `json:"password" validate:"required,max=1024"`
+	// Tenant is the tenant slug, used in multi mode.
+	Tenant string `json:"tenant" validate:"omitempty,max=63"`
+}
+
+// TokenResponse is the payload of every endpoint that signs a user in. A
+// restricted token (forced password change) carries no refresh token.
+type TokenResponse struct {
+	AccessToken        string                `json:"access_token"`
+	TokenType          string                `json:"token_type"`
+	ExpiresIn          int                   `json:"expires_in"`
+	RefreshToken       string                `json:"refresh_token,omitempty"`
+	RefreshExpiresIn   int                   `json:"refresh_expires_in,omitempty"`
+	User               UserSummaryResponse   `json:"user"`
+	Tenant             TenantSummaryResponse `json:"tenant"`
+	MustChangePassword bool                  `json:"must_change_password"`
+}
+
+// UserSummaryResponse is the signed-in user in a token response.
+type UserSummaryResponse struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+}
+
+// TenantSummaryResponse is a tenant in a token response or a tenant choice.
+type TenantSummaryResponse struct {
+	ID   string `json:"id"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
+// TenantChoiceResponse answers a multi-mode sign-in that named no tenant when
+// the user belongs to several: the client repeats the call with one of them.
+type TenantChoiceResponse struct {
+	TenantRequired bool                    `json:"tenant_required"`
+	Tenants        []TenantSummaryResponse `json:"tenants"`
+}
+
+// tokenTypeBearer is the token_type of every access token.
+const tokenTypeBearer = "Bearer"

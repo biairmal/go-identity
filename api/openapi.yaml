@@ -173,7 +173,10 @@ paths:
       summary: Sign in with a password
       description: |
         Rate limited per IP and per email. An unknown email and a wrong
-        password return identical bodies.
+        password return identical bodies. A locked account answers 401
+        ACCOUNT_LOCKED with `meta.retry_after` and a `Retry-After` header;
+        EMAIL_NOT_VERIFIED and ACCOUNT_DISABLED are only returned after a
+        correct password.
 
         In multi mode, a user who belongs to several tenants and named none
         gets 200 with `tenant_required` and the tenants to choose from, and no

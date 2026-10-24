@@ -3,13 +3,17 @@ package app
 import (
 	"context"
 	"net/http"
+	"slices"
 
+	sdkauth "github.com/biairmal/go-sdk/lib/auth"
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/httpkit"
 	"github.com/biairmal/go-sdk/lib/httpkit/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	identitytoken "github.com/biairmal/go-identity/internal/module/auth/token"
+	"github.com/biairmal/go-identity/internal/platform/apierr"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
 )
 
@@ -53,6 +57,53 @@ func groups(r chi.Router) httpx.Routes {
 		v1.Route("/internal", func(g chi.Router) { rt.Internal = g })
 	})
 	return rt
+}
+
+// scopedRoutes lists, per token scope, the only routes a token carrying that
+// scope may call. Every other authenticated route rejects any token with a
+// scope claim. A route serving a scoped token is listed here when it is
+// mounted.
+var scopedRoutes = map[string][]scopedRoute{
+	// A forced password change: the token may only choose a new password.
+	identitytoken.ScopePasswordChange: {{http.MethodPost, "/v1/me/password"}},
+}
+
+// scopedRoute is one method and exact path.
+type scopedRoute struct{ method, path string }
+
+// restrictScopedTokens rejects a request whose validated token carries a
+// scope claim, unless allowed lists the route for that scope. A
+// password-change token answers 403 PASSWORD_CHANGE_REQUIRED (APP_FLOW 9);
+// any other scope is a plain 403. Requests without claims (public routes,
+// auth disabled) pass through.
+func restrictScopedTokens(allowed map[string][]scopedRoute) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := sdkauth.ClaimsFromContext(r.Context())
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			raw, has := claims.Get(identitytoken.ClaimScope)
+			if !has {
+				next.ServeHTTP(w, r)
+				return
+			}
+			scope, isString := raw.(string)
+			if !isString {
+				scope = ""
+			}
+			if slices.Contains(allowed[scope], scopedRoute{r.Method, r.URL.Path}) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			var err error = errorz.Forbidden().WithMessage("token scope does not allow this route")
+			if scope == identitytoken.ScopePasswordChange {
+				err = apierr.New(apierr.ReasonPasswordChangeRequired)
+			}
+			handler.WriteErrorResponse(w, http.StatusForbidden, err)
+		})
+	}
 }
 
 // codeMethodNotAllowed is the error code of the 405 envelope; errorz has no

@@ -13,6 +13,7 @@ import (
 	"github.com/biairmal/go-identity/internal/module/auth/onetime"
 	"github.com/biairmal/go-identity/internal/module/auth/token"
 	"github.com/biairmal/go-identity/internal/platform/clock"
+	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
 	"github.com/biairmal/go-identity/internal/platform/mail"
 )
@@ -28,6 +29,11 @@ type Module struct {
 	log     logger.Logger
 	// registrations runs sign-up and email verification.
 	registrations *Registrations
+	// logins runs password sign-in.
+	logins *Logins
+	// limiter rate-limits the public sign-in and sign-up routes; nil
+	// allows everything.
+	limiter Limiter
 	// authConfig is the public view of cfg served at /v1/auth/config.
 	authConfig AuthConfigResponse
 }
@@ -45,12 +51,16 @@ type Deps struct {
 	V validator.Validator
 	// Outbox queues mail in the caller's transaction.
 	Outbox mail.Enqueuer
-	// Users, Tenants, Roles and Audit are ports over the other modules,
-	// wired by internal/app. The sign-up flows need all four.
-	Users   Users
-	Tenants Tenants
-	Roles   Roles
-	Audit   AuditWriter
+	// Users, Tenants, Roles, Sessions and Audit are ports over the other
+	// modules, wired by internal/app.
+	Users    Users
+	Tenants  Tenants
+	Roles    Roles
+	Sessions Sessions
+	Audit    AuditWriter
+	// Limiter rate-limits sign-in and sign-up by IP and by email key, with
+	// the modules.auth.security.login_rate_limit budget. nil disables it.
+	Limiter Limiter
 }
 
 // New loads the signing keys and builds the token builder. It fails when the
@@ -95,6 +105,16 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		users: deps.Users, tenants: deps.Tenants, roles: deps.Roles, audit: deps.Audit,
 		outbox: deps.Outbox, tokens: tokens, tokRepo: tokRepo, clock: clk, log: log,
 	}
+	m.limiter = deps.Limiter
+	m.logins = &Logins{
+		cfg: &m.cfg, tenancy: deps.Tenancy, v: v,
+		tx: func(ctx context.Context, fn func(ctx context.Context) error) error {
+			return database.WithTx(ctx, deps.DB, fn)
+		},
+		users: deps.Users, tenants: deps.Tenants, roles: deps.Roles, sessions: deps.Sessions,
+		audit: deps.Audit, limiter: deps.Limiter, tokens: builder, clock: clk, log: log,
+		dummyHash: newDummyHash(),
+	}
 	return m, nil
 }
 
@@ -116,6 +136,7 @@ func (m *Module) SyncKeys(ctx context.Context) error {
 func (m *Module) Register(rt *httpx.Routes) {
 	rt.Root.Method(http.MethodGet, jwksPath, sdkauth.JWKSHandler(m.keys.Public))
 	rt.API.Get(authConfigPath, httpx.Handle(m.getAuthConfig))
+	rt.API.Post(loginPath, httpx.Handle(m.login))
 	rt.API.Post(registerPath, httpx.Handle(m.register))
 	rt.API.Post(verifyEmailPath, httpx.Handle(m.verifyEmail))
 	rt.API.Post(resendVerifyPath, httpx.Handle(m.resendVerification))

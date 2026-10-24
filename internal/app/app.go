@@ -18,6 +18,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/lifecycle"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/metrics"
+	"github.com/biairmal/go-sdk/lib/redis"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
@@ -25,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/ratelimit"
 	"github.com/biairmal/go-identity/internal/platform/requestip"
 	"github.com/biairmal/go-identity/migrations"
 )
@@ -36,6 +38,7 @@ type App struct {
 	db      *sqlkit.DB
 	tracer  tracer.Tracer
 	metrics *prometheus.Registry
+	redis   redis.Client
 	handler http.Handler
 	ready   atomic.Bool
 }
@@ -72,9 +75,14 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 		return nil, err
 	}
 
+	limiter, err := a.newLimiter()
+	if err != nil {
+		a.close(ctx)
+		return nil, err
+	}
 	deps := Deps{
 		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: authz.NewNoOp(),
-		Outbox: database.NewOutbox(db),
+		Outbox: database.NewOutbox(db), Limiter: limiter,
 	}
 	modules, svc, err := buildModules(&a.cfg, deps)
 	if err != nil {
@@ -93,7 +101,7 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 		return nil, err
 	}
 	if authMW != nil {
-		chain = append(chain, authMW)
+		chain = append(chain, authMW, restrictScopedTokens(scopedRoutes))
 	}
 	a.handler = a.routes(modules, chain)
 	return a, nil
@@ -154,6 +162,29 @@ func (a *App) authMiddleware() (func(http.Handler) http.Handler, error) {
 	return middleware.Auth(v, middleware.WithPolicy(a.cfg.Auth.Policy())), nil
 }
 
+// newLimiter builds the sign-in rate limiter from
+// modules.auth.security.login_rate_limit. With Redis configured the limit is
+// shared by every pod; without it, or when Redis cannot be reached at
+// startup, it is in-memory per pod and a warning says so. Redis is a soft
+// dependency (it is never a readiness check), so an outage must not stop
+// the service from starting.
+func (a *App) newLimiter() (*ratelimit.Limiter, error) {
+	count, window, err := a.cfg.Modules.Auth.Security.ParsedLoginRateLimit()
+	if err != nil {
+		return nil, err
+	}
+	if a.cfg.Redis.Enabled() {
+		client, err := redis.NewClient(&a.cfg.Redis.Config)
+		if err != nil {
+			a.log.Error("redis unreachable at startup, falling back to in-memory rate limits",
+				logger.F("error", err.Error()))
+		} else {
+			a.redis = client
+		}
+	}
+	return ratelimit.New(count, window, a.redis, a.log)
+}
+
 // Handler returns the full HTTP handler, middleware included.
 func (a *App) Handler() http.Handler { return a.handler }
 
@@ -186,6 +217,7 @@ func (a *App) Serve(ctx context.Context) error {
 		lifecycle.WithLogger(a.log),
 		lifecycle.WithCloser("tracer", lifecycle.CloserFromTracer(a.tracer)),
 		lifecycle.WithCloser("db", lifecycle.CloserFromDB(a.db)),
+		lifecycle.WithCloser("redis", lifecycle.CloserFromRedis(a.redis)),
 	)
 }
 
@@ -199,6 +231,11 @@ func (a *App) close(ctx context.Context) {
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
 			a.log.Error("database close", logger.F("error", err.Error()))
+		}
+	}
+	if a.redis != nil {
+		if err := a.redis.Close(); err != nil {
+			a.log.Error("redis close", logger.F("error", err.Error()))
 		}
 	}
 }

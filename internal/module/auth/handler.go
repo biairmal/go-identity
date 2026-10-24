@@ -2,15 +2,18 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/biairmal/go-sdk/lib/httpkit/response"
 
 	"github.com/biairmal/go-identity/internal/platform/httpx"
+	"github.com/biairmal/go-identity/internal/platform/requestip"
 )
 
 // Public endpoints below /v1.
 const (
 	authConfigPath   = "/auth/config"
+	loginPath        = "/auth/login"
 	registerPath     = "/auth/register"
 	verifyEmailPath  = "/auth/email/verify"
 	resendVerifyPath = "/auth/email/resend"
@@ -25,8 +28,14 @@ func (m *Module) getAuthConfig(*http.Request) (any, error) {
 // register answers POST /v1/auth/register with 202 and the same body whether
 // or not the address already has an account.
 func (m *Module) register(r *http.Request) (any, error) {
+	if err := m.limit(r, limitRegisterIP, requestip.Get(r.Context())); err != nil {
+		return nil, err
+	}
 	var in RegisterRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	if err := m.limitEmail(r, limitRegisterMail, in.Email); err != nil {
 		return nil, err
 	}
 	if err := m.registrations.Register(r.Context(), &in); err != nil {
@@ -50,12 +59,49 @@ func (m *Module) verifyEmail(r *http.Request) (any, error) {
 // resendVerification answers POST /v1/auth/email/resend with 202 whatever the
 // address, so it cannot be used to find accounts.
 func (m *Module) resendVerification(r *http.Request) (any, error) {
+	if err := m.limit(r, limitResendIP, requestip.Get(r.Context())); err != nil {
+		return nil, err
+	}
 	var in ResendVerificationRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	if err := m.limitEmail(r, limitResendMail, in.Email); err != nil {
 		return nil, err
 	}
 	if err := m.registrations.ResendVerification(r.Context(), in.Email); err != nil {
 		return nil, err
 	}
 	return &response.Success{HTTPStatusCode: http.StatusAccepted, Data: accepted}, nil
+}
+
+// login answers POST /v1/auth/login with a token response, or with the
+// tenants to choose from in multi mode.
+func (m *Module) login(r *http.Request) (any, error) {
+	var in LoginRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	return m.logins.Login(r.Context(), &in, Device{
+		UserAgent: truncateUserAgent(r.UserAgent()),
+		IP:        requestip.Get(r.Context()),
+	})
+}
+
+// limit checks one rate-limit key; an empty value (no client IP) or no
+// limiter skips it.
+func (m *Module) limit(r *http.Request, prefix, value string) error {
+	if m.limiter == nil || value == "" {
+		return nil
+	}
+	return m.limiter.Check(r.Context(), prefix+value)
+}
+
+// limitEmail limits by the address's blind-index key, so the plain address
+// never reaches the limiter. A blank address is left to validation.
+func (m *Module) limitEmail(r *http.Request, prefix, email string) error {
+	if m.registrations.users == nil || strings.TrimSpace(email) == "" {
+		return nil
+	}
+	return m.limit(r, prefix, m.registrations.users.EmailKey(email))
 }
