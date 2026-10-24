@@ -15,6 +15,7 @@ import (
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
+	"github.com/biairmal/go-identity/internal/platform/ratelimit"
 )
 
 // Deps are the shared dependencies handed to every module's New.
@@ -24,6 +25,9 @@ type Deps struct {
 	V      validator.Validator
 	Authz  authz.Authorizer
 	Outbox *database.Outbox
+	// Limiter rate-limits the public sign-in and sign-up routes; nil turns
+	// rate limiting off.
+	Limiter *ratelimit.Limiter
 }
 
 // Module is a feature boundary. internal/app only sees this: it builds each
@@ -78,18 +82,24 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 
 	// auth loads the signing keys, so a service that cannot sign a token
 	// does not start.
-	authModule, err := identityauth.New(&cfg.Modules.Auth, &identityauth.Deps{
-		DB:      deps.DB,
-		Log:     deps.Log,
-		Clock:   clock.System{},
-		Tenancy: cfg.Modules.Tenant.Mode,
-		V:       deps.V,
-		Outbox:  deps.Outbox,
-		Users:   authUsers{svc: userModule.Service()},
-		Tenants: tenantMemberships{svc: tenantModule.Service()},
-		Roles:   authRoles{svc: rbacModule.Service()},
-		Audit:   authAudit{w: auditModule.Writer()},
-	})
+	authDeps := &identityauth.Deps{
+		DB:       deps.DB,
+		Log:      deps.Log,
+		Clock:    clock.System{},
+		Tenancy:  cfg.Modules.Tenant.Mode,
+		V:        deps.V,
+		Outbox:   deps.Outbox,
+		Users:    authUsers{svc: userModule.Service()},
+		Tenants:  tenantMemberships{svc: tenantModule.Service()},
+		Roles:    authRoles{svc: rbacModule.Service()},
+		Sessions: authSessions{svc: sessionModule.Service()},
+		Audit:    authAudit{w: auditModule.Writer()},
+	}
+	if deps.Limiter != nil {
+		// Assigned only when set, so the interface never holds a nil pointer.
+		authDeps.Limiter = deps.Limiter
+	}
+	authModule, err := identityauth.New(&cfg.Modules.Auth, authDeps)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"encoding/hex"
 	"time"
 
 	"github.com/biairmal/go-sdk/lib/logger"
@@ -78,10 +79,17 @@ func (s *Service) Lock(ctx context.Context, id uuid.UUID, until *time.Time) erro
 	return s.repo.Lock(ctx, id, until)
 }
 
+// ClearFailedLogins resets the failure counter and any lock without
+// recording a sign-in, so counting starts afresh after a lock has expired.
+func (s *Service) ClearFailedLogins(ctx context.Context, id uuid.UUID) error {
+	return s.repo.ResetFailedLogins(ctx, id)
+}
+
 // RecordSignIn clears the failure counter and the lock and stamps the
-// sign-in time, which is what a successful authentication leaves behind.
+// sign-in time, which is what a successful authentication leaves behind. It
+// joins the caller's transaction when there is one.
 func (s *Service) RecordSignIn(ctx context.Context, id uuid.UUID, at time.Time) error {
-	return database.WithTx(ctx, s.repo.db, func(ctx context.Context) error {
+	return database.InTx(ctx, s.repo.db, func(ctx context.Context) error {
 		if err := s.repo.ResetFailedLogins(ctx, id); err != nil {
 			return err
 		}
@@ -112,6 +120,20 @@ func (s *Service) SetPassword(ctx context.Context, id uuid.UUID, hash string) er
 		}
 		return s.repo.SetMustChangePassword(ctx, id, false)
 	})
+}
+
+// UpdatePasswordHash stores a new hash of the same password, as a rehash with
+// stronger parameters does at sign-in. Unlike SetPassword it leaves a forced
+// password change in place, because the user has not chosen a new password.
+func (s *Service) UpdatePasswordHash(ctx context.Context, id uuid.UUID, hash string) error {
+	return s.creds.Set(ctx, id, hash)
+}
+
+// EmailKey is a stable, non-reversible key for an address, whatever its
+// spelling: the hex of its keyed blind index. Rate limits key on it so a plain
+// address never reaches the limiter's store.
+func (s *Service) EmailKey(email string) string {
+	return hex.EncodeToString(s.repo.cipher.BlindIndex(NormalizeEmail(email)))
 }
 
 // RequirePasswordChange forces the next sign-in to choose a new password,

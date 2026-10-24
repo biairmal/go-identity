@@ -10,6 +10,7 @@ import (
 	identityauth "github.com/biairmal/go-identity/internal/module/auth"
 	"github.com/biairmal/go-identity/internal/module/auth/password"
 	"github.com/biairmal/go-identity/internal/module/rbac"
+	"github.com/biairmal/go-identity/internal/module/session"
 	"github.com/biairmal/go-identity/internal/module/tenant"
 	"github.com/biairmal/go-identity/internal/module/user"
 )
@@ -99,6 +100,33 @@ func (m tenantMemberships) BySlug(ctx context.Context, slug string) (uuid.UUID, 
 	return t.ID, t.Active(), nil
 }
 
+// Tenant returns the tenant sign-in issues a token for.
+func (m tenantMemberships) Tenant(ctx context.Context, id uuid.UUID) (*identityauth.TenantInfo, error) {
+	t, err := m.svc.ByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &identityauth.TenantInfo{ID: t.ID, Slug: t.Slug, Name: t.Name, Active: t.Active()}, nil
+}
+
+// Memberships lists the user's tenants for multi-mode sign-in.
+func (m tenantMemberships) Memberships(ctx context.Context, userID uuid.UUID) ([]identityauth.Membership, error) {
+	ms, err := m.svc.MembershipsOf(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]identityauth.Membership, 0, len(ms))
+	for _, ms := range ms {
+		out = append(out, identityauth.Membership{
+			Tenant: identityauth.TenantInfo{
+				ID: ms.TenantID, Slug: ms.Slug, Name: ms.Name, Active: ms.TenantStatus == tenant.StatusActive,
+			},
+			Active: ms.MemberStatus == tenant.MemberActive,
+		})
+	}
+	return out, nil
+}
+
 // authAudit adapts the audit writer to the port auth declares.
 type authAudit struct{ w *audit.Writer }
 
@@ -158,11 +186,50 @@ func (a authUsers) VerifyEmail(ctx context.Context, id uuid.UUID, at time.Time) 
 	return a.svc.VerifyEmail(ctx, u, at)
 }
 
+// PasswordHash returns the stored argon2id hash.
+func (a authUsers) PasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
+	c, err := a.svc.Credentials(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return c.PasswordHash, nil
+}
+
+// UpdatePasswordHash stores a rehash of the same password.
+func (a authUsers) UpdatePasswordHash(ctx context.Context, id uuid.UUID, hash string) error {
+	return a.svc.UpdatePasswordHash(ctx, id, hash)
+}
+
+// RecordFailedLogin counts one failed sign-in.
+func (a authUsers) RecordFailedLogin(ctx context.Context, id uuid.UUID) (int, error) {
+	return a.svc.RecordFailedLogin(ctx, id)
+}
+
+// Lock blocks sign-in until the given time.
+func (a authUsers) Lock(ctx context.Context, id uuid.UUID, until time.Time) error {
+	return a.svc.Lock(ctx, id, &until)
+}
+
+// ClearFailedLogins resets the failure counter and any lock.
+func (a authUsers) ClearFailedLogins(ctx context.Context, id uuid.UUID) error {
+	return a.svc.ClearFailedLogins(ctx, id)
+}
+
+// RecordSignIn resets the counters and stamps the sign-in time.
+func (a authUsers) RecordSignIn(ctx context.Context, id uuid.UUID, at time.Time) error {
+	return a.svc.RecordSignIn(ctx, id, at)
+}
+
+// EmailKey is the address's blind-index key.
+func (a authUsers) EmailKey(email string) string { return a.svc.EmailKey(email) }
+
 // toAccount keeps the fields auth reads.
 func toAccount(u *user.User) *identityauth.Account {
 	return &identityauth.Account{
 		ID: u.ID, Email: u.Email, DisplayName: u.DisplayName,
 		Status: u.Status, EmailVerified: u.EmailVerified(),
+		IsSuperAdmin: u.IsSuperAdmin, MustChangePassword: u.MustChangePassword,
+		LockedUntil: u.LockedUntil,
 	}
 }
 
@@ -184,4 +251,31 @@ func (a authRoles) Assign(ctx context.Context, tenantID, userID uuid.UUID, names
 		return nil
 	}
 	return a.svc.AssignRoles(ctx, tenantID, userID, ids, nil)
+}
+
+// RoleNames lists the user's roles in the tenant, for the roles claim.
+func (a authRoles) RoleNames(ctx context.Context, tenantID, userID uuid.UUID) ([]string, error) {
+	return a.svc.RoleNames(ctx, tenantID, userID)
+}
+
+// Permissions is the user's effective permissions in the tenant, for the
+// perms claim.
+func (a authRoles) Permissions(ctx context.Context, tenantID, userID uuid.UUID) ([]string, error) {
+	return a.svc.EffectivePermissions(ctx, tenantID, userID)
+}
+
+// authSessions adapts the session service to the port auth declares.
+type authSessions struct{ svc *session.Service }
+
+// Issue starts a new refresh-token family.
+func (a authSessions) Issue(
+	ctx context.Context, userID, tenantID uuid.UUID, d identityauth.Device,
+) (*identityauth.IssuedSession, error) {
+	issued, err := a.svc.Issue(ctx, userID, tenantID, session.Device{UserAgent: d.UserAgent, IP: d.IP})
+	if err != nil {
+		return nil, err
+	}
+	return &identityauth.IssuedSession{
+		Raw: issued.Raw, FamilyID: issued.Token.FamilyID, ExpiresAt: issued.Token.ExpiresAt,
+	}, nil
 }
