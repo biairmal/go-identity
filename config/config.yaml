@@ -43,6 +43,7 @@ auth:                                         # enabled + auth.Config
     - { pattern: /readyz, public: true }
     - { pattern: /version, public: true }
     - { pattern: /metrics, public: true }
+    - { method: GET, pattern: /v1/auth/config, public: true }   # sign-in screen settings
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}

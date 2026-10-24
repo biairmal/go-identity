@@ -25,6 +25,8 @@ type Module struct {
 	keyRepo *KeyRepository
 	onetime *onetime.Service
 	log     logger.Logger
+	// authConfig is the public view of cfg served at /v1/auth/config.
+	authConfig AuthConfigResponse
 }
 
 // Deps are what auth needs from internal/app.
@@ -32,6 +34,9 @@ type Deps struct {
 	DB    *sqlkit.DB
 	Log   logger.Logger
 	Clock clock.Clock
+	// Tenancy is the tenancy mode ("single" or "multi"), owned by the
+	// tenant module and passed through by internal/app.
+	Tenancy string
 }
 
 // New loads the signing keys and builds the token builder. It fails when the
@@ -56,9 +61,10 @@ func New(cfg *Config, deps Deps) (*Module, error) {
 	}
 	return &Module{
 		cfg: *cfg, keys: set, tokens: builder,
-		keyRepo: NewKeyRepository(deps.DB),
-		onetime: onetime.NewService(onetime.NewRepository(deps.DB), deps.Clock),
-		log:     log,
+		keyRepo:    NewKeyRepository(deps.DB),
+		onetime:    onetime.NewService(onetime.NewRepository(deps.DB), deps.Clock),
+		log:        log,
+		authConfig: newAuthConfigResponse(cfg, deps.Tenancy),
 	}, nil
 }
 
@@ -76,9 +82,10 @@ func (m *Module) SyncKeys(ctx context.Context) error {
 }
 
 // Register mounts the JWKS endpoint outside /v1, where resource services and
-// go-sdk's JWKS client expect it.
+// go-sdk's JWKS client expect it, and the public sign-in endpoints on /v1.
 func (m *Module) Register(rt *httpx.Routes) {
 	rt.Root.Method(http.MethodGet, jwksPath, sdkauth.JWKSHandler(m.keys.Public))
+	rt.API.Get(authConfigPath, httpx.Handle(m.getAuthConfig))
 }
 
 // jwksPath is the well-known location of the public key set.

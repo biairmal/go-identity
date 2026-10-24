@@ -68,9 +68,10 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 	// auth loads the signing keys, so it is the one module whose New can
 	// fail: a service that cannot sign a token must not start.
 	authModule, err := identityauth.New(&cfg.Modules.Auth, identityauth.Deps{
-		DB:    deps.DB,
-		Log:   deps.Log,
-		Clock: clock.System{},
+		DB:      deps.DB,
+		Log:     deps.Log,
+		Clock:   clock.System{},
+		Tenancy: cfg.Modules.Tenant.Mode,
 	})
 	if err != nil {
 		return nil, nil, err
