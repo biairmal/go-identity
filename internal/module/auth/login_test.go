@@ -84,6 +84,12 @@ func (f *fakeUsers) UpdatePasswordHash(_ context.Context, id uuid.UUID, hash str
 	return nil
 }
 
+func (f *fakeUsers) SetPassword(_ context.Context, id uuid.UUID, hash string) error {
+	u := f.find(id)
+	u.hash, u.account.MustChangePassword = hash, false
+	return nil
+}
+
 func (f *fakeUsers) RecordFailedLogin(_ context.Context, id uuid.UUID) (int, error) {
 	u := f.find(id)
 	u.failed++

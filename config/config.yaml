@@ -52,6 +52,8 @@ auth:                                         # enabled + auth.Config
     - { method: POST, pattern: /v1/auth/refresh, public: true }      # refresh token in the body
     - { method: POST, pattern: /v1/auth/logout, public: true }
     - { method: POST, pattern: /v1/auth/logout-all, public: true }
+    - { method: POST, pattern: /v1/auth/password/forgot, public: true }
+    - { method: POST, pattern: /v1/auth/password/reset, public: true }
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}

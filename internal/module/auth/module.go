@@ -33,6 +33,8 @@ type Module struct {
 	logins *Logins
 	// refreshes runs refresh, logout and logout-all.
 	refreshes *Refreshes
+	// resets runs forgot-password and reset-password.
+	resets *PasswordResets
 	// limiter rate-limits the public sign-in and sign-up routes; nil
 	// allows everything.
 	limiter Limiter
@@ -110,6 +112,10 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		users: deps.Users, tenants: deps.Tenants, roles: deps.Roles, audit: deps.Audit,
 		outbox: deps.Outbox, tokens: tokens, tokRepo: tokRepo, clock: clk, log: log,
 	}
+	m.resets = &PasswordResets{
+		cfg: &m.cfg, db: deps.DB, v: v, users: deps.Users, sessions: deps.Sessions, audit: deps.Audit,
+		outbox: deps.Outbox, tokens: tokens, tokRepo: tokRepo, log: log,
+	}
 	m.limiter = deps.Limiter
 	tx := func(ctx context.Context, fn func(ctx context.Context) error) error {
 		return database.WithTx(ctx, deps.DB, fn)
@@ -153,6 +159,8 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.API.Post(registerPath, httpx.Handle(m.register))
 	rt.API.Post(verifyEmailPath, httpx.Handle(m.verifyEmail))
 	rt.API.Post(resendVerifyPath, httpx.Handle(m.resendVerification))
+	rt.API.Post(forgotPasswordPath, httpx.Handle(m.forgotPassword))
+	rt.API.Post(resetPasswordPath, httpx.Handle(m.resetPassword))
 }
 
 // jwksPath is the well-known location of the public key set.

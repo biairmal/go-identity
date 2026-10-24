@@ -201,6 +201,11 @@ func (a authUsers) UpdatePasswordHash(ctx context.Context, id uuid.UUID, hash st
 	return a.svc.UpdatePasswordHash(ctx, id, hash)
 }
 
+// SetPassword stores a newly chosen password and clears a forced change.
+func (a authUsers) SetPassword(ctx context.Context, id uuid.UUID, hash string) error {
+	return a.svc.SetPassword(ctx, id, hash)
+}
+
 // RecordFailedLogin counts one failed sign-in.
 func (a authUsers) RecordFailedLogin(ctx context.Context, id uuid.UUID) (int, error) {
 	return a.svc.RecordFailedLogin(ctx, id)

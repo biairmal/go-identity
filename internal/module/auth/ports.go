@@ -31,6 +31,9 @@ type Users interface {
 	// UpdatePasswordHash stores a new hash of the same password, after a
 	// rehash with stronger parameters. A forced password change stays.
 	UpdatePasswordHash(ctx context.Context, id uuid.UUID, hash string) error
+	// SetPassword stores a newly chosen password and clears a forced password
+	// change.
+	SetPassword(ctx context.Context, id uuid.UUID, hash string) error
 	// RecordFailedLogin counts one failed sign-in and returns the new total.
 	RecordFailedLogin(ctx context.Context, id uuid.UUID) (int, error)
 	// Lock blocks sign-in until the given time.
@@ -212,6 +215,7 @@ const (
 	ActionLogout        = "auth.logout"
 	ActionLogoutAll     = "auth.logout_all"
 	ActionRefreshReuse  = "auth.refresh_reuse"
+	ActionPasswordReset = "auth.password_reset"
 )
 
 // TargetUser is the target type of the events above.

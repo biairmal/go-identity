@@ -382,6 +382,8 @@ paths:
                 email: { type: string, format: email, maxLength: 254 }
       responses:
         "202": { $ref: "#/components/responses/Accepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
   /v1/auth/password/reset:
@@ -404,6 +406,7 @@ paths:
       responses:
         "204": { description: Password changed }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
   /v1/auth/email/verify:
