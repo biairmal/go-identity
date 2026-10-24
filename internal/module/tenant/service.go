@@ -2,7 +2,9 @@ package tenant
 
 import (
 	"context"
+	"errors"
 
+	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/google/uuid"
 
@@ -89,6 +91,30 @@ func (s *Service) AddMember(ctx context.Context, tenantID, userID uuid.UUID, sta
 		TenantID: tenantID, Action: ActionMemberAdd,
 		TargetType: TargetMembership, TargetID: userID.String(),
 		After: map[string]any{"status": status},
+	})
+}
+
+// EnsureActiveMember makes a user an active member of a tenant: it adds the
+// membership when there is none, reactivates an invited or removed one, and
+// leaves an active one alone. Every change is audited; a no-op is not.
+func (s *Service) EnsureActiveMember(ctx context.Context, tenantID, userID uuid.UUID) error {
+	m, err := s.repo.Member(ctx, tenantID, userID)
+	switch {
+	case errors.Is(err, errorz.ErrNotFound):
+		return s.AddMember(ctx, tenantID, userID, MemberActive)
+	case err != nil:
+		return err
+	case m.Active():
+		return nil
+	}
+	if err := s.repo.SetMemberStatus(ctx, tenantID, userID, MemberActive); err != nil {
+		return err
+	}
+	return s.writeAudit(ctx, &AuditEvent{
+		TenantID: tenantID, Action: ActionMemberAdd,
+		TargetType: TargetMembership, TargetID: userID.String(),
+		Before: map[string]any{"status": m.Status},
+		After:  map[string]any{"status": MemberActive},
 	})
 }
 

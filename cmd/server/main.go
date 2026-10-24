@@ -1,4 +1,4 @@
-// Command server runs go-identity: serve (default) | worker | migrate.
+// Command server runs go-identity: serve (default) | worker | migrate | superadmin.
 package main
 
 import (
@@ -50,8 +50,10 @@ func run(args []string) error {
 		return app.RunWorker(ctx, &cfg, log)
 	case "migrate":
 		return migrate(ctx, &cfg, log, args)
+	case "superadmin":
+		return superAdmin(ctx, liveSuperAdminOps(&cfg, log), args, os.Stdout)
 	default:
-		return fmt.Errorf("unknown command %q (want serve, worker or migrate)", cmd)
+		return fmt.Errorf("unknown command %q (want serve, worker, migrate or superadmin)", cmd)
 	}
 }
 

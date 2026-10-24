@@ -11,12 +11,10 @@ import (
 // start and on every pod, so it has to find its own earlier work and leave it
 // alone. A failure here stops startup rather than serving a half-set-up
 // service.
-//
-// Later milestones add their steps here: the super admin bootstrap (T3.3).
 func (a *App) bootstrap(ctx context.Context, svc *services) error {
 	// One transaction, so a start that fails half way leaves nothing
-	// behind: either the tenant, its roles and the audit rows are all
-	// there, or none of them are.
+	// behind: either the tenant, its roles, the super admin and the audit
+	// rows are all there, or none of them are.
 	return database.WithTx(ctx, a.db, func(ctx context.Context) error {
 		if err := svc.rbac.SyncCatalog(ctx); err != nil {
 			return err
@@ -27,7 +25,11 @@ func (a *App) bootstrap(ctx context.Context, svc *services) error {
 		if _, err := svc.tenant.EnsureDefault(ctx); err != nil {
 			return err
 		}
-		return a.seedRoles(ctx, svc)
+		if err := a.seedRoles(ctx, svc); err != nil {
+			return err
+		}
+		// Last, because the super admin joins the default tenant.
+		return svc.superAdmins.Bootstrap(ctx)
 	})
 }
 

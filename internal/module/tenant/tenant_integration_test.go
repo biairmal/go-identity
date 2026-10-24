@@ -272,3 +272,46 @@ func insertUser(ctx context.Context, t *testing.T, db *sqlkit.DB, label string) 
 	}
 	return id
 }
+
+// TestEnsureActiveMember covers the three starting points: no membership
+// (added and audited), an invited one (activated and audited) and an active
+// one (left alone, no audit row).
+func TestEnsureActiveMember(t *testing.T) {
+	db := testkit.Postgres(t)
+	ctx := context.Background()
+	svc, rec := newService(db, Default())
+	tn, err := svc.EnsureDefault(ctx)
+	if err != nil {
+		t.Fatalf("EnsureDefault() = %v", err)
+	}
+	fresh := insertUser(ctx, t, db, "fresh@example.com")
+	invited := insertUser(ctx, t, db, "invited@example.com")
+	if err := svc.AddMember(ctx, tn.ID, invited, MemberInvited); err != nil {
+		t.Fatalf("AddMember() = %v", err)
+	}
+
+	for _, id := range []uuid.UUID{fresh, invited} {
+		before := len(rec.events)
+		if err := svc.EnsureActiveMember(ctx, tn.ID, id); err != nil {
+			t.Fatalf("EnsureActiveMember() = %v", err)
+		}
+		m, err := svc.Member(ctx, tn.ID, id)
+		if err != nil {
+			t.Fatalf("Member() = %v", err)
+		}
+		if !m.Active() || m.JoinedAt == nil {
+			t.Errorf("membership = %+v, want active with a joined_at", m)
+		}
+		if len(rec.events) != before+1 || rec.events[len(rec.events)-1].Action != ActionMemberAdd {
+			t.Errorf("want one %s audit event for the change", ActionMemberAdd)
+		}
+	}
+
+	before := len(rec.events)
+	if err := svc.EnsureActiveMember(ctx, tn.ID, fresh); err != nil {
+		t.Fatalf("EnsureActiveMember() on an active member = %v", err)
+	}
+	if len(rec.events) != before {
+		t.Error("an already active membership was audited again")
+	}
+}

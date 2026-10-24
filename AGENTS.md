@@ -14,7 +14,7 @@ are generic service-template code (no identity logic) so they can later move int
 
 | Path | Role |
 |---|---|
-| `cmd/server` | One binary: `serve` (default), `worker`, `migrate` |
+| `cmd/server` | One binary: `serve` (default), `worker`, `migrate`, `superadmin` |
 | `internal/app` | Config, dependency wiring, middleware chain, routes and route groups, adapters between modules, lifecycle |
 | `internal/platform/*` | Generic plumbing, no business rules: database, HTTP conventions and `httpx.Routes`, list queries, tenant scope, API errors, test kit. Never imports `app` or a module |
 | `internal/module/<name>` | One feature boundary each (`audit`, `tenant`, `rbac`, `session`, `user`, `auth`); helpers used by one module are its subpackages |

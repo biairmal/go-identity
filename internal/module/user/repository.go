@@ -186,6 +186,23 @@ func (r *Repository) SuperAdminExists(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
+// SuperAdmin returns the current super admin, or errorz.NotFound before the
+// first start has created one.
+func (r *Repository) SuperAdmin(ctx context.Context) (*User, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT `+userColumns+` FROM users WHERE is_super_admin`)
+	return r.scan(row)
+}
+
+// SetSuperAdmin sets or clears the super admin flag. The partial unique index
+// allows one flagged row at a time, so a transfer clears the old holder before
+// it flags the new one.
+func (r *Repository) SetSuperAdmin(ctx context.Context, id uuid.UUID, on bool) error {
+	return r.exec(ctx,
+		`UPDATE users SET is_super_admin = $2, version = version + 1, updated_at = now()
+		 WHERE id = $1`, id, on)
+}
+
 // encrypt returns the ciphertext and the blind index of an already-normalized
 // email.
 func (r *Repository) encrypt(normalized string) (enc, hash []byte, err error) {
