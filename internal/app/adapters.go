@@ -201,6 +201,16 @@ func (a authUsers) UpdatePasswordHash(ctx context.Context, id uuid.UUID, hash st
 	return a.svc.UpdatePasswordHash(ctx, id, hash)
 }
 
+// SetDisplayName renames the account, reading it first for the current
+// version.
+func (a authUsers) SetDisplayName(ctx context.Context, id uuid.UUID, name string) error {
+	u, err := a.svc.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	return a.svc.SetDisplayName(ctx, id, u.Version, name)
+}
+
 // SetPassword stores a newly chosen password and clears a forced change.
 func (a authUsers) SetPassword(ctx context.Context, id uuid.UUID, hash string) error {
 	return a.svc.SetPassword(ctx, id, hash)
@@ -333,4 +343,19 @@ func toIssuedSession(issued *session.Issued) *identityauth.IssuedSession {
 	return &identityauth.IssuedSession{
 		Raw: issued.Raw, FamilyID: t.FamilyID, UserID: t.UserID, TenantID: t.TenantID, ExpiresAt: t.ExpiresAt,
 	}
+}
+
+// sessionAudit adapts the audit writer to the port session declares.
+type sessionAudit struct{ w *audit.Writer }
+
+// Write maps a session audit event to the audit module's event.
+func (a sessionAudit) Write(ctx context.Context, e *session.AuditEvent) error {
+	return a.w.Write(ctx, &audit.Event{
+		TenantID:   e.TenantID,
+		ActorID:    e.ActorID,
+		Action:     audit.Action(e.Action),
+		TargetType: e.TargetType,
+		TargetID:   e.TargetID,
+		After:      e.After,
+	})
 }

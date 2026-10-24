@@ -98,25 +98,29 @@ func (r *Repository) RevokeAllForUser(ctx context.Context, userID uuid.UUID, at 
 	return nil
 }
 
-// ListForUser returns the live sessions of one user, newest first, for the
-// session list and for revoking one device.
-func (r *Repository) ListForUser(ctx context.Context, userID uuid.UUID, now time.Time) ([]Token, error) {
+// ListSessions returns the live sessions of one user, one per family, most
+// recently used first. A family's live token is its newest, so its issue
+// time is when the device last refreshed; the family began with its oldest.
+func (r *Repository) ListSessions(ctx context.Context, userID uuid.UUID, now time.Time) ([]Session, error) {
 	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
-		`SELECT `+tokenColumns+`
-		 FROM refresh_tokens
-		 WHERE user_id = $1 AND revoked_at IS NULL AND rotated_at IS NULL AND expires_at > $2
-		 ORDER BY issued_at DESC`, userID, now)
+		`SELECT t.family_id,
+		        (SELECT min(f.issued_at) FROM refresh_tokens f WHERE f.family_id = t.family_id),
+		        t.issued_at, t.user_agent, host(t.ip)
+		 FROM refresh_tokens t
+		 WHERE t.user_id = $1 AND t.revoked_at IS NULL AND t.rotated_at IS NULL
+		   AND t.expires_at > $2 AND t.absolute_expires_at > $2
+		 ORDER BY t.issued_at DESC`, userID, now)
 	if err != nil {
 		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: list")
 	}
 	defer func() { _ = rows.Close() }()
-	var out []Token
+	var out []Session
 	for rows.Next() {
-		t, err := scanTokenRow(rows)
-		if err != nil {
-			return nil, err
+		var s Session
+		if err := rows.Scan(&s.FamilyID, &s.CreatedAt, &s.LastUsedAt, &s.UserAgent, &s.IP); err != nil {
+			return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: scan session")
 		}
-		out = append(out, *t)
+		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: list rows")
@@ -124,19 +128,21 @@ func (r *Repository) ListForUser(ctx context.Context, userID uuid.UUID, now time
 	return out, nil
 }
 
-// FamilyOf returns the family a session belongs to, so revoking one session
-// revokes the chain it is part of rather than just that row.
-func (r *Repository) FamilyOf(ctx context.Context, userID, id uuid.UUID) (uuid.UUID, error) {
-	var familyID uuid.UUID
-	err := database.Leader(ctx, r.db).QueryRowContext(ctx,
-		`SELECT family_id FROM refresh_tokens WHERE id = $1 AND user_id = $2`, id, userID).Scan(&familyID)
+// RevokeUserFamily revokes a family only if it belongs to userID and still
+// has a live token. It reports how many tokens it revoked, so zero means not
+// found as far as that user can tell.
+func (r *Repository) RevokeUserFamily(ctx context.Context, userID, familyID uuid.UUID, at time.Time) (int64, error) {
+	res, err := database.Leader(ctx, r.db).ExecContext(ctx,
+		`UPDATE refresh_tokens SET revoked_at = $3
+		 WHERE family_id = $1 AND user_id = $2 AND revoked_at IS NULL`, familyID, userID, at)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return uuid.Nil, errorz.NotFound().WithMessage("session: not found")
-		}
-		return uuid.Nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: family of")
+		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: revoke user family")
 	}
-	return familyID, nil
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: revoke user family")
+	}
+	return n, nil
 }
 
 // scanToken reads one token row, mapping no rows to errorz.NotFound.
@@ -148,17 +154,6 @@ func scanToken(row *sql.Row) (*Token, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errorz.NotFound().WithMessage("session: token not found")
 		}
-		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: scan token")
-	}
-	return &t, nil
-}
-
-// scanTokenRow reads one token from a multi-row result.
-func scanTokenRow(rows *sql.Rows) (*Token, error) {
-	var t Token
-	err := rows.Scan(&t.ID, &t.FamilyID, &t.UserID, &t.TenantID, &t.IssuedAt, &t.ExpiresAt,
-		&t.AbsoluteExpiresAt, &t.RotatedAt, &t.RevokedAt, &t.UserAgent, &t.IP)
-	if err != nil {
 		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: scan token")
 	}
 	return &t, nil

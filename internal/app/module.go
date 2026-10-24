@@ -76,6 +76,7 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 		DB:    deps.DB,
 		Log:   deps.Log,
 		Clock: clock.System{},
+		Audit: sessionAudit{w: auditModule.Writer()},
 	})
 
 	userModule, err := newUserModule(cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service())

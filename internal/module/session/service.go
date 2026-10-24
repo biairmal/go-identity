@@ -41,6 +41,8 @@ type Service struct {
 	db    *sqlkit.DB
 	clock clock.Clock
 	log   logger.Logger
+	// audit records sign-outs from the session list; set by New.
+	audit AuditWriter
 }
 
 // NewService returns a Service. clk and log may be nil.
@@ -222,19 +224,38 @@ func (s *Service) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error 
 	return s.repo.RevokeAllForUser(ctx, userID, s.clock.Now())
 }
 
-// RevokeSession revokes the family behind one listed session, so the device
-// cannot refresh again.
-func (s *Service) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error {
-	familyID, err := s.repo.FamilyOf(ctx, userID, sessionID)
+// RevokeSession revokes one of the user's sessions (a family), so that
+// device cannot refresh again. A family that is not the user's, or has no
+// live token left, is an errorz.NotFound error, so IDs cannot be probed.
+func (s *Service) RevokeSession(ctx context.Context, userID, familyID uuid.UUID) error {
+	n, err := s.repo.RevokeUserFamily(ctx, userID, familyID, s.clock.Now())
 	if err != nil {
 		return err
 	}
-	return s.RevokeFamily(ctx, familyID)
+	if n == 0 {
+		return errorz.NotFound().WithMessage("session: not found")
+	}
+	return nil
 }
 
-// List returns the user's live sessions.
-func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Token, error) {
-	return s.repo.ListForUser(ctx, userID, s.clock.Now())
+// SignOutDevice revokes one of the user's sessions from the session list and
+// audits it as a logout, in one transaction.
+func (s *Service) SignOutDevice(ctx context.Context, userID, tenantID, familyID uuid.UUID) error {
+	return database.WithTx(ctx, s.db, func(ctx context.Context) error {
+		if err := s.RevokeSession(ctx, userID, familyID); err != nil {
+			return err
+		}
+		return s.audit.Write(ctx, &AuditEvent{
+			TenantID: tenantID, ActorID: userID, Action: ActionLogout,
+			TargetType: "user", TargetID: userID.String(),
+			After: map[string]any{"family_id": familyID.String(), "via": "session_list"},
+		})
+	})
+}
+
+// List returns the user's live sessions, one per device.
+func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Session, error) {
+	return s.repo.ListSessions(ctx, userID, s.clock.Now())
 }
 
 // newRawToken generates 256 bits of randomness, base64url encoded.

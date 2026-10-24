@@ -13,6 +13,7 @@ import (
 
 	identitykeys "github.com/biairmal/go-identity/internal/module/auth/keys"
 	"github.com/biairmal/go-identity/internal/platform/clock"
+	"github.com/biairmal/go-identity/internal/platform/scope"
 )
 
 // Claim names. They are chosen so go-sdk auth reads them with no mapping: it
@@ -50,6 +51,10 @@ type Subject struct {
 	// Scope restricts a token to one purpose, such as a password change
 	// after a forced reset. Empty means a full token.
 	Scope string
+	// SessionID is the refresh-token family the token is issued with, put in
+	// the sid claim so the session list can mark the current device. Zero
+	// for a token without a session.
+	SessionID uuid.UUID
 	// TTL overrides the configured access-token lifetime when positive,
 	// e.g. for a short-lived restricted token.
 	TTL time.Duration
@@ -107,6 +112,9 @@ func (b *Builder) Access(_ context.Context, s *Subject, tenantID uuid.UUID) (str
 	}
 	if s.SuperAdmin {
 		extra[ClaimSuperAdmin] = true
+	}
+	if s.SessionID != uuid.Nil {
+		extra[scope.ClaimSession] = s.SessionID.String()
 	}
 	if s.Scope != "" {
 		extra[ClaimScope] = s.Scope

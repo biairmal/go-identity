@@ -291,8 +291,8 @@ func TestLoginMustChangePasswordIntegration(t *testing.T) {
 
 	f.register(t)
 	full := f.login(t, "bia@example.com", loginPassword)
-	if got := f.get(t, "/v1/me", full.Data["access_token"].(string)); got.Status != http.StatusNotFound {
-		t.Errorf("GET /v1/me with a full token = %d %s, want 404 (passes auth)", got.Status, got.Raw)
+	if got := f.get(t, "/v1/me", full.Data["access_token"].(string)); got.Status != http.StatusOK {
+		t.Errorf("GET /v1/me with a full token = %d %s, want 200", got.Status, got.Raw)
 	}
 	if got := f.get(t, "/v1/me", "not-a-token"); got.Status != http.StatusUnauthorized {
 		t.Errorf("GET /v1/me with a bad token = %d, want 401", got.Status)

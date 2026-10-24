@@ -608,6 +608,8 @@ paths:
         "200": { $ref: "#/components/responses/TokenResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/me/tenants:
     get:
@@ -665,7 +667,7 @@ paths:
     delete:
       tags: [me]
       summary: Unlink Google
-      description: Refused when it is the only remaining way to sign in.
+      description: Refused when it is the only remaining way to sign in. 204 also when nothing is linked.
       operationId: unlinkGoogle
       responses:
         "204": { description: Unlinked }

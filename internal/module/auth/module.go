@@ -33,6 +33,8 @@ type Module struct {
 	logins *Logins
 	// refreshes runs refresh, logout and logout-all.
 	refreshes *Refreshes
+	// profiles serves the caller's own account under /v1/me.
+	profiles *Profiles
 	// resets runs forgot-password and reset-password.
 	resets *PasswordResets
 	// limiter rate-limits the public sign-in and sign-up routes; nil
@@ -127,6 +129,11 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		audit: deps.Audit, limiter: deps.Limiter, issue: issue, clock: clk, log: log,
 		dummyHash: newDummyHash(),
 	}
+	m.profiles = &Profiles{
+		cfg: &m.cfg, tx: tx, v: v, users: deps.Users, tenants: deps.Tenants, roles: deps.Roles,
+		sessions: deps.Sessions, audit: deps.Audit, identities: NewIdentityRepository(deps.DB),
+		issue: issue, log: log,
+	}
 	m.refreshes = &Refreshes{
 		tx: tx, v: v, users: deps.Users, tenants: deps.Tenants, sessions: deps.Sessions,
 		audit: deps.Audit, limiter: deps.RefreshLimiter, issue: issue, clock: clk, log: log,
@@ -161,6 +168,11 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.API.Post(resendVerifyPath, httpx.Handle(m.resendVerification))
 	rt.API.Post(forgotPasswordPath, httpx.Handle(m.forgotPassword))
 	rt.API.Post(resetPasswordPath, httpx.Handle(m.resetPassword))
+	rt.Me.Get(mePath, httpx.Handle(m.getMe))
+	rt.Me.Patch(mePath, httpx.Handle(m.updateMe))
+	rt.Me.Post(mePasswordPath, httpx.Handle(m.changePassword))
+	rt.Me.Get(meTenantsPath, httpx.Handle(m.myTenants))
+	rt.Me.Delete(meGoogleIdentity, httpx.Handle(m.unlinkGoogle))
 }
 
 // jwksPath is the well-known location of the public key set.

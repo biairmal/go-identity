@@ -302,7 +302,7 @@ func TestListAndRevokeSession(t *testing.T) {
 	}
 
 	// Signing the laptop out leaves the phone working.
-	if err := f.svc.RevokeSession(ctx, f.userID, laptop.Token.ID); err != nil {
+	if err := f.svc.RevokeSession(ctx, f.userID, laptop.Token.FamilyID); err != nil {
 		t.Fatalf("RevokeSession() = %v", err)
 	}
 	if _, err := f.svc.Rotate(ctx, laptop.Raw, device()); !errors.Is(err, ErrRevoked) {
@@ -318,7 +318,7 @@ func TestListAndRevokeSession(t *testing.T) {
 		t.Fatalf("List() = %v", err)
 	}
 	for _, s := range sessions {
-		if s.ID == laptop.Token.ID {
+		if s.FamilyID == laptop.Token.FamilyID {
 			t.Error("the revoked session is still listed")
 		}
 	}
@@ -335,7 +335,7 @@ func TestRevokeSessionOfAnotherUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Issue() = %v", err)
 	}
-	err = f.svc.RevokeSession(ctx, uuid.New(), issued.Token.ID)
+	err = f.svc.RevokeSession(ctx, uuid.New(), issued.Token.FamilyID)
 	if err == nil {
 		t.Fatal("RevokeSession() for another user = nil, want not found")
 	}

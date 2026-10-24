@@ -28,7 +28,7 @@ func TestCheckPassword(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkPassword(tt.plain, tt.minLength)
+			err := checkPassword("password", tt.plain, tt.minLength)
 			if tt.wantMsg == "" {
 				if err != nil {
 					t.Fatalf("checkPassword() = %v, want nil", err)

@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/biairmal/go-sdk/lib/auth"
 	"github.com/biairmal/go-sdk/lib/authz"
+	"github.com/biairmal/go-sdk/lib/ctxkit"
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/repository"
 	"github.com/google/uuid"
@@ -42,4 +44,41 @@ func TenantFilter(ctx context.Context) (repository.FilterCondition, error) {
 		return repository.FilterCondition{}, err
 	}
 	return repository.FilterCondition{Field: TenantColumn, Operator: repository.FilterOperatorEq, Value: id}, nil
+}
+
+// ClaimSession is the access-token claim naming the refresh-token family the
+// token was issued with. A token issued without a session (the restricted
+// password-change token) carries none.
+const ClaimSession = "sid"
+
+// ErrNoUser reports a context without an authenticated subject.
+var ErrNoUser = errors.New("scope: no user in context")
+
+// User returns the caller's user ID from the token subject. It fails with a
+// 401 when the context carries no subject or a malformed one.
+func User(ctx context.Context) (uuid.UUID, error) {
+	id, err := uuid.Parse(ctxkit.UserID(ctx))
+	if err != nil || id == uuid.Nil {
+		return uuid.Nil, errorz.Wrap(ErrNoUser).WithCode(errorz.CodeUnauthorized).WithMessage(ErrNoUser.Error())
+	}
+	return id, nil
+}
+
+// Session returns the refresh-token family the caller's token was issued
+// with, or uuid.Nil when the token names none.
+func Session(ctx context.Context) uuid.UUID {
+	claims, ok := auth.ClaimsFromContext(ctx)
+	if !ok {
+		return uuid.Nil
+	}
+	raw, _ := claims.Get(ClaimSession)
+	s, ok := raw.(string)
+	if !ok {
+		return uuid.Nil
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
 }

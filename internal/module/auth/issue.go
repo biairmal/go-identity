@@ -24,7 +24,7 @@ type tokenIssuer struct {
 func (t *tokenIssuer) session(
 	ctx context.Context, a *Account, tenant *TenantInfo, s *IssuedSession,
 ) (*TokenResponse, error) {
-	sub := &token.Subject{UserID: a.ID, SuperAdmin: a.IsSuperAdmin}
+	sub := &token.Subject{UserID: a.ID, SuperAdmin: a.IsSuperAdmin, SessionID: s.FamilyID}
 	var err error
 	if sub.Roles, err = t.roles.RoleNames(ctx, tenant.ID, a.ID); err != nil {
 		return nil, err
