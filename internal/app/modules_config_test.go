@@ -62,6 +62,9 @@ func TestModuleConfigValidate(t *testing.T) {
 		{"rate limit with a bad window", func(c *Config) {
 			c.Modules.Auth.Security.LoginRateLimit = "10/forever"
 		}, "modules.auth"},
+		{"bad refresh rate limit", func(c *Config) {
+			c.Modules.Auth.Security.RefreshRateLimit = "10"
+		}, "modules.auth"},
 		{"zero lockout threshold", func(c *Config) {
 			c.Modules.Auth.Security.LockoutAfterFailures = 0
 		}, "modules.auth"},

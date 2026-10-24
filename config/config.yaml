@@ -49,6 +49,9 @@ auth:                                         # enabled + auth.Config
     - { method: POST, pattern: /v1/auth/register, public: true }
     - { method: POST, pattern: /v1/auth/email/verify, public: true }
     - { method: POST, pattern: /v1/auth/email/resend, public: true }
+    - { method: POST, pattern: /v1/auth/refresh, public: true }      # refresh token in the body
+    - { method: POST, pattern: /v1/auth/logout, public: true }
+    - { method: POST, pattern: /v1/auth/logout-all, public: true }
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}
@@ -118,6 +121,7 @@ modules:
 
     security:
       login_rate_limit: 10/5m                 # per IP and per email
+      refresh_rate_limit: 60/5m               # POST /v1/auth/refresh, per IP
       lockout_after_failures: 10
       lockout_duration: 15m
 

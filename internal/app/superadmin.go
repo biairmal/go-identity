@@ -20,7 +20,7 @@ import (
 // user: the module declares the port and app owns the go-sdk crypto adapter
 // behind it.
 func newUserModule(
-	cfg *Config, deps Deps, auditModule *audit.Module, tenants *tenant.Service, sessions *session.Service,
+	cfg *Config, deps *Deps, auditModule *audit.Module, tenants *tenant.Service, sessions *session.Service,
 ) (*user.Module, error) {
 	cipher, err := newEmailCipher(cfg, deps.Log)
 	if err != nil {
@@ -88,7 +88,7 @@ func withSuperAdmins(
 
 // superAdminsOver builds the super admin operations over an open database.
 func superAdminsOver(cfg *Config, db *sqlkit.DB, log logger.Logger) (*user.SuperAdmins, error) {
-	deps := Deps{DB: db, Log: log}
+	deps := &Deps{DB: db, Log: log}
 	auditModule := audit.New(audit.Deps{DB: db, Log: log})
 	tenants := tenant.New(cfg.Modules.Tenant, tenant.Deps{
 		DB: db, Log: log, Audit: tenantAudit{w: auditModule.Writer()},

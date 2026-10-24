@@ -148,8 +148,16 @@ func (fakeRoles) Permissions(context.Context, uuid.UUID, uuid.UUID) ([]string, e
 	return []string{"notes:read"}, nil
 }
 
-// fakeSessions records issued families.
-type fakeSessions struct{ issued []Device }
+// fakeSessions records issued families. rotated and rotateErr script
+// Rotate; tokens backs Lookup; the revoke calls are recorded.
+type fakeSessions struct {
+	issued        []Device
+	rotated       *IssuedSession
+	rotateErr     error
+	tokens        map[string]*SessionToken
+	revokedFamily []uuid.UUID
+	revokedUser   []uuid.UUID
+}
 
 func (f *fakeSessions) Issue(_ context.Context, _, _ uuid.UUID, d Device) (*IssuedSession, error) {
 	f.issued = append(f.issued, d)
@@ -233,8 +241,9 @@ func newLoginFixture(t *testing.T, tenancy string) *loginFixture {
 	f.logins = &Logins{
 		cfg: &cfg, tenancy: tenancy, v: validator.New(validator.Config{FieldNameTag: "json"}),
 		tx:    func(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) },
-		users: f.users, tenants: f.tenants, roles: fakeRoles{}, sessions: f.sessions,
-		audit: f.audit, limiter: f.limiter, tokens: builder, clock: clk, log: logger.NewNoOp(),
+		users: f.users, tenants: f.tenants, sessions: f.sessions,
+		audit: f.audit, limiter: f.limiter, clock: clk, log: logger.NewNoOp(),
+		issue: &tokenIssuer{cfg: &cfg, roles: fakeRoles{}, tokens: builder, clock: clk},
 		dummyHash: func() string {
 			h, _ := password.HashWith("dummy", weakParams)
 			return h

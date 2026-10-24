@@ -16,7 +16,7 @@ const (
 	ActionPasswordReset  Action = "auth.password_reset"
 	ActionPasswordChange Action = "auth.password_change"
 	ActionTokenRefresh   Action = "auth.token_refresh" //nolint:gosec // an audit action name, not a credential
-	ActionRefreshReused  Action = "auth.refresh_reused"
+	ActionRefreshReuse   Action = "auth.refresh_reuse"
 	ActionTenantSwitch   Action = "auth.tenant_switch"
 )
 

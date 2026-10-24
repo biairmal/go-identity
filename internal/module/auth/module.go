@@ -31,6 +31,8 @@ type Module struct {
 	registrations *Registrations
 	// logins runs password sign-in.
 	logins *Logins
+	// refreshes runs refresh, logout and logout-all.
+	refreshes *Refreshes
 	// limiter rate-limits the public sign-in and sign-up routes; nil
 	// allows everything.
 	limiter Limiter
@@ -61,6 +63,9 @@ type Deps struct {
 	// Limiter rate-limits sign-in and sign-up by IP and by email key, with
 	// the modules.auth.security.login_rate_limit budget. nil disables it.
 	Limiter Limiter
+	// RefreshLimiter rate-limits refresh by IP with the
+	// modules.auth.security.refresh_rate_limit budget. nil disables it.
+	RefreshLimiter Limiter
 }
 
 // New loads the signing keys and builds the token builder. It fails when the
@@ -106,14 +111,19 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		outbox: deps.Outbox, tokens: tokens, tokRepo: tokRepo, clock: clk, log: log,
 	}
 	m.limiter = deps.Limiter
+	tx := func(ctx context.Context, fn func(ctx context.Context) error) error {
+		return database.WithTx(ctx, deps.DB, fn)
+	}
+	issue := &tokenIssuer{cfg: &m.cfg, roles: deps.Roles, tokens: builder, clock: clk}
 	m.logins = &Logins{
-		cfg: &m.cfg, tenancy: deps.Tenancy, v: v,
-		tx: func(ctx context.Context, fn func(ctx context.Context) error) error {
-			return database.WithTx(ctx, deps.DB, fn)
-		},
-		users: deps.Users, tenants: deps.Tenants, roles: deps.Roles, sessions: deps.Sessions,
-		audit: deps.Audit, limiter: deps.Limiter, tokens: builder, clock: clk, log: log,
+		cfg: &m.cfg, tenancy: deps.Tenancy, v: v, tx: tx,
+		users: deps.Users, tenants: deps.Tenants, sessions: deps.Sessions,
+		audit: deps.Audit, limiter: deps.Limiter, issue: issue, clock: clk, log: log,
 		dummyHash: newDummyHash(),
+	}
+	m.refreshes = &Refreshes{
+		tx: tx, v: v, users: deps.Users, tenants: deps.Tenants, sessions: deps.Sessions,
+		audit: deps.Audit, limiter: deps.RefreshLimiter, issue: issue, clock: clk, log: log,
 	}
 	return m, nil
 }
@@ -137,6 +147,9 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.Root.Method(http.MethodGet, jwksPath, sdkauth.JWKSHandler(m.keys.Public))
 	rt.API.Get(authConfigPath, httpx.Handle(m.getAuthConfig))
 	rt.API.Post(loginPath, httpx.Handle(m.login))
+	rt.API.Post(refreshPath, httpx.Handle(m.refresh))
+	rt.API.Post(logoutPath, httpx.Handle(m.logout))
+	rt.API.Post(logoutAllPath, httpx.Handle(m.logoutAll))
 	rt.API.Post(registerPath, httpx.Handle(m.register))
 	rt.API.Post(verifyEmailPath, httpx.Handle(m.verifyEmail))
 	rt.API.Post(resendVerifyPath, httpx.Handle(m.resendVerification))

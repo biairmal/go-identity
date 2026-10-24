@@ -99,6 +99,10 @@ type SecurityConfig struct {
 	// LoginRateLimit is "<count>/<window>", e.g. 10/5m, applied per IP and
 	// per email.
 	LoginRateLimit string `mapstructure:"login_rate_limit"`
+	// RefreshRateLimit is "<count>/<window>" for POST /v1/auth/refresh, per
+	// IP. It is looser than the login budget: every signed-in client
+	// refreshes on its own, and many may share one address.
+	RefreshRateLimit string `mapstructure:"refresh_rate_limit"`
 	// LockoutAfterFailures locks an account after this many consecutive
 	// failures.
 	LockoutAfterFailures int `mapstructure:"lockout_after_failures"`
@@ -126,6 +130,7 @@ func Default() Config {
 		},
 		Security: SecurityConfig{
 			LoginRateLimit:       "10/5m",
+			RefreshRateLimit:     "60/5m",
 			LockoutAfterFailures: 10,
 			LockoutDuration:      15 * time.Minute,
 		},
@@ -275,6 +280,9 @@ func (s SecurityConfig) validate() error {
 	if _, _, err := s.ParsedLoginRateLimit(); err != nil {
 		return err
 	}
+	if _, _, err := s.ParsedRefreshRateLimit(); err != nil {
+		return err
+	}
 	if s.LockoutAfterFailures <= 0 {
 		return errorz.BadRequest().WithMessage("security.lockout_after_failures must be positive")
 	}
@@ -287,21 +295,27 @@ func (s SecurityConfig) validate() error {
 // ParsedLoginRateLimit splits "<count>/<window>" into its parts, e.g. 10/5m
 // into 10 and 5 minutes.
 func (s SecurityConfig) ParsedLoginRateLimit() (count int, window time.Duration, err error) {
-	raw := strings.TrimSpace(s.LoginRateLimit)
-	before, after, found := strings.Cut(raw, "/")
+	return parseRate("security.login_rate_limit", s.LoginRateLimit)
+}
+
+// ParsedRefreshRateLimit splits RefreshRateLimit like ParsedLoginRateLimit.
+func (s SecurityConfig) ParsedRefreshRateLimit() (count int, window time.Duration, err error) {
+	return parseRate("security.refresh_rate_limit", s.RefreshRateLimit)
+}
+
+// parseRate splits a "<count>/<window>" rate; field names it in errors.
+func parseRate(field, raw string) (count int, window time.Duration, err error) {
+	before, after, found := strings.Cut(strings.TrimSpace(raw), "/")
 	if !found {
-		return 0, 0, errorz.BadRequest().
-			WithMessage(`security.login_rate_limit must look like "10/5m"`)
+		return 0, 0, errorz.BadRequest().WithMessage(field + ` must look like "10/5m"`)
 	}
 	count, err = strconv.Atoi(strings.TrimSpace(before))
 	if err != nil || count <= 0 {
-		return 0, 0, errorz.BadRequest().
-			WithMessage("security.login_rate_limit count must be a positive number")
+		return 0, 0, errorz.BadRequest().WithMessage(field + " count must be a positive number")
 	}
 	window, err = time.ParseDuration(strings.TrimSpace(after))
 	if err != nil || window <= 0 {
-		return 0, 0, errorz.BadRequest().
-			WithMessage("security.login_rate_limit window must be a positive duration, e.g. 5m")
+		return 0, 0, errorz.BadRequest().WithMessage(field + " window must be a positive duration, e.g. 5m")
 	}
 	return count, window, nil
 }

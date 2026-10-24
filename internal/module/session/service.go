@@ -191,6 +191,24 @@ func (s *Service) issue(ctx context.Context, t *Token) (*Issued, error) {
 	return &Issued{Raw: raw, Token: t}, nil
 }
 
+// Lookup returns the token behind a raw value in whatever state it is, or an
+// errorz.NotFound error. Sign-out uses it to find the family and the user.
+func (s *Service) Lookup(ctx context.Context, raw string) (*Token, error) {
+	return s.repo.ByHash(ctx, hashToken(raw))
+}
+
+// Exchangeable reports whether t could still be exchanged now: not revoked,
+// within its sliding and absolute expiry, and either never rotated or rotated
+// inside the grace window. It is the same test Rotate applies, without the
+// side effects.
+func (s *Service) Exchangeable(t *Token) bool {
+	now := s.clock.Now()
+	if t.Revoked() || now.After(t.ExpiresAt) || now.After(t.AbsoluteExpiresAt) {
+		return false
+	}
+	return !t.Rotated() || now.Sub(*t.RotatedAt) <= s.cfg.RefreshReuseGrace
+}
+
 // RevokeFamily revokes one chain of tokens, which is what signing out of a
 // single device does.
 func (s *Service) RevokeFamily(ctx context.Context, familyID uuid.UUID) error {

@@ -17,6 +17,9 @@ const (
 	registerPath     = "/auth/register"
 	verifyEmailPath  = "/auth/email/verify"
 	resendVerifyPath = "/auth/email/resend"
+	refreshPath      = "/auth/refresh"
+	logoutPath       = "/auth/logout"
+	logoutAllPath    = "/auth/logout-all"
 )
 
 // getAuthConfig answers GET /v1/auth/config. Configuration is fixed for the
@@ -82,10 +85,47 @@ func (m *Module) login(r *http.Request) (any, error) {
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		return nil, err
 	}
-	return m.logins.Login(r.Context(), &in, Device{
-		UserAgent: truncateUserAgent(r.UserAgent()),
-		IP:        requestip.Get(r.Context()),
-	})
+	return m.logins.Login(r.Context(), &in, device(r))
+}
+
+// refresh answers POST /v1/auth/refresh with a new token response.
+func (m *Module) refresh(r *http.Request) (any, error) {
+	var in RefreshRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	return m.refreshes.Refresh(r.Context(), &in, device(r))
+}
+
+// logout answers POST /v1/auth/logout with 204, also for a token that no
+// longer works.
+func (m *Module) logout(r *http.Request) (any, error) {
+	var in RefreshRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	if err := m.refreshes.Logout(r.Context(), &in); err != nil {
+		return nil, err
+	}
+	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
+}
+
+// logoutAll answers POST /v1/auth/logout-all with 204, also for a token that
+// no longer works.
+func (m *Module) logoutAll(r *http.Request) (any, error) {
+	var in RefreshRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	if err := m.refreshes.LogoutAll(r.Context(), &in); err != nil {
+		return nil, err
+	}
+	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
+}
+
+// device is where a request came from, stored with the session it creates.
+func device(r *http.Request) Device {
+	return Device{UserAgent: truncateUserAgent(r.UserAgent()), IP: requestip.Get(r.Context())}
 }
 
 // limit checks one rate-limit key; an empty value (no client IP) or no

@@ -66,6 +66,13 @@ type LoginRequest struct {
 	Tenant string `json:"tenant" validate:"omitempty,max=63"`
 }
 
+// RefreshRequest is the body of POST /v1/auth/refresh, /logout and
+// /logout-all. The token travels in the JSON body only; identity sets no
+// cookies (TRD 10).
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required,max=256"`
+}
+
 // TokenResponse is the payload of every endpoint that signs a user in. A
 // restricted token (forced password change) carries no refresh token.
 type TokenResponse struct {

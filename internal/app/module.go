@@ -28,6 +28,9 @@ type Deps struct {
 	// Limiter rate-limits the public sign-in and sign-up routes; nil turns
 	// rate limiting off.
 	Limiter *ratelimit.Limiter
+	// RefreshLimiter rate-limits POST /v1/auth/refresh with its own budget;
+	// nil turns it off.
+	RefreshLimiter *ratelimit.Limiter
 }
 
 // Module is a feature boundary. internal/app only sees this: it builds each
@@ -54,7 +57,7 @@ type services struct {
 // services internal/app needs afterwards. Adding a module adds one entry
 // here. The order is the one modules are registered in, not a dependency
 // order: modules never depend on each other directly, only through ports.
-func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
+func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 	auditModule := audit.New(audit.Deps{DB: deps.DB, Log: deps.Log})
 
 	tenantModule := tenant.New(cfg.Modules.Tenant, tenant.Deps{
@@ -98,6 +101,9 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 	if deps.Limiter != nil {
 		// Assigned only when set, so the interface never holds a nil pointer.
 		authDeps.Limiter = deps.Limiter
+	}
+	if deps.RefreshLimiter != nil {
+		authDeps.RefreshLimiter = deps.RefreshLimiter
 	}
 	authModule, err := identityauth.New(&cfg.Modules.Auth, authDeps)
 	if err != nil {
