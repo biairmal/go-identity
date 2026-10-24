@@ -44,6 +44,9 @@ auth:                                         # enabled + auth.Config
     - { pattern: /version, public: true }
     - { pattern: /metrics, public: true }
     - { method: GET, pattern: /v1/auth/config, public: true }   # sign-in screen settings
+    - { method: POST, pattern: /v1/auth/register, public: true }
+    - { method: POST, pattern: /v1/auth/email/verify, public: true }
+    - { method: POST, pattern: /v1/auth/email/resend, public: true }
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}

@@ -412,7 +412,11 @@ paths:
     post:
       tags: [auth]
       summary: Resend the verification email
-      description: Rate limited. Always 202; only an existing unverified account is sent anything.
+      description: |
+        Rate limited. Always 202 for a well-formed body, whatever the address
+        (an invalid address included); only an existing unverified account is
+        sent anything. A body that is not JSON, or has unknown fields, is a 400
+        like on every route (section 9.1).
       operationId: resendVerification
       security: []
       requestBody:
@@ -426,6 +430,7 @@ paths:
                 email: { type: string, format: email }
       responses:
         "202": { $ref: "#/components/responses/Accepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
   /v1/auth/invite/{token}:

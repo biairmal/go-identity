@@ -63,6 +63,11 @@ func (s *Service) DefaultID(ctx context.Context) (uuid.UUID, error) {
 	return t.ID, nil
 }
 
+// BySlug returns the tenant with this slug, or errorz.NotFound.
+func (s *Service) BySlug(ctx context.Context, slug string) (*Tenant, error) {
+	return s.repo.BySlug(ctx, slug)
+}
+
 // ByID returns one tenant.
 func (s *Service) ByID(ctx context.Context, id uuid.UUID) (*Tenant, error) {
 	return s.repo.ByID(ctx, id)

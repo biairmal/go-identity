@@ -29,3 +29,31 @@ func newAuthConfigResponse(cfg *Config, tenancy string) AuthConfigResponse {
 		Tenancy:      tenancy,
 	}
 }
+
+// RegisterRequest is the body of POST /v1/auth/register.
+type RegisterRequest struct {
+	Email       string `json:"email" validate:"required,email,max=254"`
+	Password    string `json:"password" validate:"required"`
+	DisplayName string `json:"display_name" validate:"required,min=1,max=100"`
+	// Tenant is the tenant slug; required in multi mode, ignored in single.
+	Tenant string `json:"tenant" validate:"omitempty,max=63"`
+}
+
+// VerifyEmailRequest is the body of POST /v1/auth/email/verify.
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+// ResendVerificationRequest is the body of POST /v1/auth/email/resend.
+type ResendVerificationRequest struct {
+	Email string `json:"email"`
+}
+
+// AcceptedResponse is the body of every 202 that must not reveal whether an
+// address has an account: it is the same value on every path.
+type AcceptedResponse struct {
+	Status string `json:"status"`
+}
+
+// accepted is the one AcceptedResponse the sign-up flows return.
+var accepted = AcceptedResponse{Status: "accepted"}

@@ -546,7 +546,7 @@ func TestSuperAdminTransferIsAtomic(t *testing.T) {
 	broken := user.NewSuperAdmins(f.cfg.Modules.User.SuperAdmin, f.db,
 		user.NewRepository(f.db, cipher), user.NewCredentialsRepository(f.db), &user.SuperAdminDeps{
 			Passwords:   userPasswords{},
-			Memberships: userMemberships{svc: tenants},
+			Memberships: tenantMemberships{svc: tenants},
 			Sessions:    f.sessions(),
 			Audit:       failingAudit{},
 		})
