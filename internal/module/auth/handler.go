@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -12,14 +13,16 @@ import (
 
 // Public endpoints below /v1.
 const (
-	authConfigPath   = "/auth/config"
-	loginPath        = "/auth/login"
-	registerPath     = "/auth/register"
-	verifyEmailPath  = "/auth/email/verify"
-	resendVerifyPath = "/auth/email/resend"
-	refreshPath      = "/auth/refresh"
-	logoutPath       = "/auth/logout"
-	logoutAllPath    = "/auth/logout-all"
+	authConfigPath     = "/auth/config"
+	loginPath          = "/auth/login"
+	registerPath       = "/auth/register"
+	verifyEmailPath    = "/auth/email/verify"
+	resendVerifyPath   = "/auth/email/resend"
+	refreshPath        = "/auth/refresh"
+	logoutPath         = "/auth/logout"
+	logoutAllPath      = "/auth/logout-all"
+	forgotPasswordPath = "/auth/password/forgot"
+	resetPasswordPath  = "/auth/password/reset"
 )
 
 // getAuthConfig answers GET /v1/auth/config. Configuration is fixed for the
@@ -62,20 +65,7 @@ func (m *Module) verifyEmail(r *http.Request) (any, error) {
 // resendVerification answers POST /v1/auth/email/resend with 202 whatever the
 // address, so it cannot be used to find accounts.
 func (m *Module) resendVerification(r *http.Request) (any, error) {
-	if err := m.limit(r, limitResendIP, requestip.Get(r.Context())); err != nil {
-		return nil, err
-	}
-	var in ResendVerificationRequest
-	if err := httpx.DecodeJSON(r, &in); err != nil {
-		return nil, err
-	}
-	if err := m.limitEmail(r, limitResendMail, in.Email); err != nil {
-		return nil, err
-	}
-	if err := m.registrations.ResendVerification(r.Context(), in.Email); err != nil {
-		return nil, err
-	}
-	return &response.Success{HTTPStatusCode: http.StatusAccepted, Data: accepted}, nil
+	return m.acceptEmail(r, limitResendIP, limitResendMail, m.registrations.ResendVerification)
 }
 
 // login answers POST /v1/auth/login with a token response, or with the
@@ -144,4 +134,46 @@ func (m *Module) limitEmail(r *http.Request, prefix, email string) error {
 		return nil
 	}
 	return m.limit(r, prefix, m.registrations.users.EmailKey(email))
+}
+
+// forgotPassword answers POST /v1/auth/password/forgot with 202 whatever the
+// address, so it cannot be used to find accounts.
+func (m *Module) forgotPassword(r *http.Request) (any, error) {
+	return m.acceptEmail(r, limitForgotIP, limitForgotEmail, m.resets.Forgot)
+}
+
+// acceptEmail runs an email-only flow behind its IP and address rate limits
+// and answers 202 with the shared body, whatever fn found.
+func (m *Module) acceptEmail(
+	r *http.Request, ipPrefix, emailPrefix string, fn func(ctx context.Context, email string) error,
+) (any, error) {
+	if err := m.limit(r, ipPrefix, requestip.Get(r.Context())); err != nil {
+		return nil, err
+	}
+	var in EmailRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	if err := m.limitEmail(r, emailPrefix, in.Email); err != nil {
+		return nil, err
+	}
+	if err := fn(r.Context(), in.Email); err != nil {
+		return nil, err
+	}
+	return &response.Success{HTTPStatusCode: http.StatusAccepted, Data: accepted}, nil
+}
+
+// resetPassword answers POST /v1/auth/password/reset with 204.
+func (m *Module) resetPassword(r *http.Request) (any, error) {
+	if err := m.limit(r, limitResetIP, requestip.Get(r.Context())); err != nil {
+		return nil, err
+	}
+	var in ResetPasswordRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	if err := m.resets.Reset(r.Context(), &in); err != nil {
+		return nil, err
+	}
+	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
 }

@@ -44,8 +44,9 @@ type VerifyEmailRequest struct {
 	Token string `json:"token"`
 }
 
-// ResendVerificationRequest is the body of POST /v1/auth/email/resend.
-type ResendVerificationRequest struct {
+// EmailRequest is the body of POST /v1/auth/email/resend and
+// /v1/auth/password/forgot.
+type EmailRequest struct {
 	Email string `json:"email"`
 }
 
@@ -57,6 +58,12 @@ type AcceptedResponse struct {
 
 // accepted is the one AcceptedResponse the sign-up flows return.
 var accepted = AcceptedResponse{Status: "accepted"}
+
+// ResetPasswordRequest is the body of POST /v1/auth/password/reset.
+type ResetPasswordRequest struct {
+	Token    string `json:"token" validate:"required,max=256"`
+	Password string `json:"password" validate:"required"`
+}
 
 // LoginRequest is the body of POST /v1/auth/login.
 type LoginRequest struct {

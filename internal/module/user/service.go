@@ -112,9 +112,10 @@ func (s *Service) VerifyEmail(ctx context.Context, u *User, at time.Time) error 
 }
 
 // SetPassword replaces a user's password hash and clears the forced change,
-// because choosing a password is how that requirement is satisfied.
+// because choosing a password is how that requirement is satisfied. It
+// joins the caller's transaction when there is one.
 func (s *Service) SetPassword(ctx context.Context, id uuid.UUID, hash string) error {
-	return database.WithTx(ctx, s.repo.db, func(ctx context.Context) error {
+	return database.InTx(ctx, s.repo.db, func(ctx context.Context) error {
 		if err := s.creds.Set(ctx, id, hash); err != nil {
 			return err
 		}
