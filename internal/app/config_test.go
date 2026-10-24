@@ -34,6 +34,7 @@ func TestConfigValidate(t *testing.T) {
 		{"no db host", func(c *Config) { c.Database.Leader.Host = "" }, "database"},
 		{"auth off in production", func(c *Config) { c.Service.Environment = EnvProduction }, "auth"},
 		{"auth on needs valid auth config", func(c *Config) { c.Auth.Enabled = true; c.Auth.Mode = "nope" }, "auth"},
+		{"email keys required in staging", func(c *Config) { c.Service.Environment = EnvStaging }, "crypto"},
 		{"metrics on needs path", func(c *Config) { c.Metrics.Enabled = true; c.Metrics.Path = "" }, "metrics"},
 		{"tracing on needs endpoint", func(c *Config) { c.Tracing.Enabled = true; c.Tracing.Endpoint = "" }, "tracing"},
 		{"negative drain delay", func(c *Config) { c.Lifecycle.DrainDelay = -1 }, "lifecycle"},
