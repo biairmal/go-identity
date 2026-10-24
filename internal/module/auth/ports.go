@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -118,11 +119,47 @@ type Roles interface {
 	Permissions(ctx context.Context, tenantID, userID uuid.UUID) ([]string, error)
 }
 
-// Sessions starts refresh-token families. internal/app wires it over the
-// session module.
+// Sessions starts, rotates and revokes refresh-token families. internal/app
+// wires it over the session module, which owns the rotation rules.
 type Sessions interface {
 	// Issue starts a new family for a fresh sign-in.
 	Issue(ctx context.Context, userID, tenantID uuid.UUID, d Device) (*IssuedSession, error)
+	// Rotate exchanges a refresh token for the next one in its family. It
+	// fails with ErrRefreshReused (the family is now revoked),
+	// ErrRefreshRevoked, ErrRefreshExpired, or an errorz.NotFound error for
+	// an unknown token.
+	Rotate(ctx context.Context, raw string, d Device) (*IssuedSession, error)
+	// Lookup returns the token behind a raw value in any state, or an
+	// errorz.NotFound error.
+	Lookup(ctx context.Context, raw string) (*SessionToken, error)
+	// RevokeFamily revokes one chain of tokens: one device signed out.
+	RevokeFamily(ctx context.Context, familyID uuid.UUID) error
+	// RevokeAllForUser revokes every family of a user.
+	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// Refresh-token outcomes the Sessions port reports, mapped from the session
+// module's own errors by internal/app.
+var (
+	// ErrRefreshReused is a rotated token presented after the grace window.
+	ErrRefreshReused = errors.New("auth: refresh token reused")
+	// ErrRefreshRevoked is a token whose family was already revoked.
+	ErrRefreshRevoked = errors.New("auth: refresh token revoked")
+	// ErrRefreshExpired is a token past its sliding or absolute expiry.
+	ErrRefreshExpired = errors.New("auth: refresh token expired")
+)
+
+// SessionToken is one stored refresh token as sign-out sees it.
+type SessionToken struct {
+	FamilyID uuid.UUID
+	UserID   uuid.UUID
+	TenantID uuid.UUID
+	// Revoked is true once the token's family was revoked.
+	Revoked bool
+	// Exchangeable is true when a refresh with this token would succeed as
+	// far as the token goes: not revoked, not expired, and not rotated
+	// longer ago than the reuse grace.
+	Exchangeable bool
 }
 
 // Device describes where a sign-in came from, stored with the session.
@@ -136,6 +173,8 @@ type Device struct {
 type IssuedSession struct {
 	Raw       string
 	FamilyID  uuid.UUID
+	UserID    uuid.UUID
+	TenantID  uuid.UUID
 	ExpiresAt time.Time
 }
 
@@ -170,6 +209,9 @@ const (
 	ActionEmailVerified = "auth.email_verified"
 	ActionLogin         = "auth.login"
 	ActionLoginFailed   = "auth.login_failed"
+	ActionLogout        = "auth.logout"
+	ActionLogoutAll     = "auth.logout_all"
+	ActionRefreshReuse  = "auth.refresh_reuse"
 )
 
 // TargetUser is the target type of the events above.

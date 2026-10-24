@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -275,7 +276,56 @@ func (a authSessions) Issue(
 	if err != nil {
 		return nil, err
 	}
-	return &identityauth.IssuedSession{
-		Raw: issued.Raw, FamilyID: issued.Token.FamilyID, ExpiresAt: issued.Token.ExpiresAt,
+	return toIssuedSession(issued), nil
+}
+
+// Rotate exchanges a refresh token, mapping the session module's outcomes to
+// the errors auth declares. The errorz code is kept, so an unmapped path
+// still answers 401.
+func (a authSessions) Rotate(
+	ctx context.Context, raw string, d identityauth.Device,
+) (*identityauth.IssuedSession, error) {
+	issued, err := a.svc.Rotate(ctx, raw, session.Device{UserAgent: d.UserAgent, IP: d.IP})
+	switch {
+	case err == nil:
+		return toIssuedSession(issued), nil
+	case errors.Is(err, session.ErrReuse):
+		return nil, errors.Join(identityauth.ErrRefreshReused, err)
+	case errors.Is(err, session.ErrRevoked):
+		return nil, errors.Join(identityauth.ErrRefreshRevoked, err)
+	case errors.Is(err, session.ErrExpired):
+		return nil, errors.Join(identityauth.ErrRefreshExpired, err)
+	default:
+		return nil, err
+	}
+}
+
+// Lookup returns the stored token behind a raw value.
+func (a authSessions) Lookup(ctx context.Context, raw string) (*identityauth.SessionToken, error) {
+	t, err := a.svc.Lookup(ctx, raw)
+	if err != nil {
+		return nil, err
+	}
+	return &identityauth.SessionToken{
+		FamilyID: t.FamilyID, UserID: t.UserID, TenantID: t.TenantID,
+		Revoked: t.Revoked(), Exchangeable: a.svc.Exchangeable(t),
 	}, nil
+}
+
+// RevokeFamily revokes one family.
+func (a authSessions) RevokeFamily(ctx context.Context, familyID uuid.UUID) error {
+	return a.svc.RevokeFamily(ctx, familyID)
+}
+
+// RevokeAllForUser revokes every family of the user.
+func (a authSessions) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error {
+	return a.svc.RevokeAllForUser(ctx, userID)
+}
+
+// toIssuedSession keeps the fields auth reads from a new token.
+func toIssuedSession(issued *session.Issued) *identityauth.IssuedSession {
+	t := issued.Token
+	return &identityauth.IssuedSession{
+		Raw: issued.Raw, FamilyID: t.FamilyID, UserID: t.UserID, TenantID: t.TenantID, ExpiresAt: t.ExpiresAt,
+	}
 }

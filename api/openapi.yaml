@@ -281,9 +281,15 @@ paths:
       tags: [auth]
       summary: Exchange a refresh token for a new pair
       description: |
-        Rate limited. The presented token is rotated; presenting it again
-        after the grace window revokes its whole family. Roles and user status
-        are re-read, so a role change takes effect here.
+        Rate limited per IP (`modules.auth.security.refresh_rate_limit`). The
+        presented token is rotated; presenting it again within
+        `modules.session.refresh_reuse_grace` returns a sibling token in the
+        same family, after it revokes the whole family (401 REFRESH_REUSED).
+        Roles, user status, membership and tenant are re-read, so a role
+        change takes effect here. 401 INVALID_CREDENTIALS / REFRESH_REUSED /
+        REFRESH_EXPIRED; 403 ACCOUNT_DISABLED / TENANT_SUSPENDED /
+        PASSWORD_CHANGE_REQUIRED (forced password change: sign in again for
+        the restricted token). A 403 revokes the family.
       operationId: refresh
       security: []
       requestBody:
@@ -303,8 +309,10 @@ paths:
       tags: [auth]
       summary: Sign out of this device
       description: >
-        Revokes the token's family. Idempotent, so an already invalid token
-        also returns 204.
+        Revokes the token's family. Idempotent, so an unknown, expired or
+        already revoked token also returns 204. A body that is not JSON, has
+        unknown fields or no refresh_token is a 400 like on every route
+        (section 9.1).
       operationId: logout
       security: []
       requestBody:
@@ -314,11 +322,16 @@ paths:
             schema: { $ref: "#/components/schemas/RefreshRequest" }
       responses:
         "204": { description: Signed out }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   /v1/auth/logout-all:
     post:
       tags: [auth]
       summary: Sign out everywhere
+      description: >
+        Revokes every family of the token's owner. Only a token that could
+        still refresh signs anyone out; an unknown, expired or revoked token
+        returns 204 and changes nothing. A malformed body is a 400.
       operationId: logoutAll
       security: []
       requestBody:
@@ -328,6 +341,7 @@ paths:
             schema: { $ref: "#/components/schemas/RefreshRequest" }
       responses:
         "204": { description: Signed out of every device }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   /v1/auth/switch-tenant:
     post:
@@ -1727,7 +1741,7 @@ components:
       type: object
       required: [refresh_token]
       properties:
-        refresh_token: { type: string }
+        refresh_token: { type: string, maxLength: 256 }
 
     TokenPayload:
       type: object

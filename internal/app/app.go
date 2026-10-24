@@ -75,16 +75,16 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 		return nil, err
 	}
 
-	limiter, err := a.newLimiter()
+	limiter, refreshLimiter, err := a.newLimiters()
 	if err != nil {
 		a.close(ctx)
 		return nil, err
 	}
 	deps := Deps{
 		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: authz.NewNoOp(),
-		Outbox: database.NewOutbox(db), Limiter: limiter,
+		Outbox: database.NewOutbox(db), Limiter: limiter, RefreshLimiter: refreshLimiter,
 	}
-	modules, svc, err := buildModules(&a.cfg, deps)
+	modules, svc, err := buildModules(&a.cfg, &deps)
 	if err != nil {
 		a.close(ctx)
 		return nil, err
@@ -162,16 +162,22 @@ func (a *App) authMiddleware() (func(http.Handler) http.Handler, error) {
 	return middleware.Auth(v, middleware.WithPolicy(a.cfg.Auth.Policy())), nil
 }
 
-// newLimiter builds the sign-in rate limiter from
-// modules.auth.security.login_rate_limit. With Redis configured the limit is
-// shared by every pod; without it, or when Redis cannot be reached at
-// startup, it is in-memory per pod and a warning says so. Redis is a soft
-// dependency (it is never a readiness check), so an outage must not stop
-// the service from starting.
-func (a *App) newLimiter() (*ratelimit.Limiter, error) {
-	count, window, err := a.cfg.Modules.Auth.Security.ParsedLoginRateLimit()
+// newLimiters builds the sign-in rate limiter from
+// modules.auth.security.login_rate_limit and the refresh limiter from
+// refresh_rate_limit. With Redis configured the limits are shared by every
+// pod; without it, or when Redis cannot be reached at startup, they are
+// in-memory per pod and a warning says so. Redis is a soft dependency (it is
+// never a readiness check), so an outage must not stop the service from
+// starting.
+func (a *App) newLimiters() (login, refresh *ratelimit.Limiter, err error) {
+	sec := a.cfg.Modules.Auth.Security
+	count, window, err := sec.ParsedLoginRateLimit()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	refreshCount, refreshWindow, err := sec.ParsedRefreshRateLimit()
+	if err != nil {
+		return nil, nil, err
 	}
 	if a.cfg.Redis.Enabled() {
 		client, err := redis.NewClient(&a.cfg.Redis.Config)
@@ -182,7 +188,13 @@ func (a *App) newLimiter() (*ratelimit.Limiter, error) {
 			a.redis = client
 		}
 	}
-	return ratelimit.New(count, window, a.redis, a.log)
+	if login, err = ratelimit.New(count, window, a.redis, a.log); err != nil {
+		return nil, nil, err
+	}
+	if refresh, err = ratelimit.New(refreshCount, refreshWindow, a.redis, logger.NewNoOp()); err != nil {
+		return nil, nil, err
+	}
+	return login, refresh, nil
 }
 
 // Handler returns the full HTTP handler, middleware included.

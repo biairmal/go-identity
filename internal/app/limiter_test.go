@@ -23,21 +23,26 @@ func TestNewLimiterBackend(t *testing.T) {
 			cfg := validConfig(t)
 			cfg.Redis = tt.redis
 			a := &App{cfg: cfg, log: logger.NewNoOp()}
-			l, err := a.newLimiter()
+			l, r, err := a.newLimiters()
 			if err != nil {
-				t.Fatalf("newLimiter: %v", err)
+				t.Fatalf("newLimiters: %v", err)
 			}
-			if l.Backend() != "memory" || a.redis != nil {
-				t.Errorf("backend = %s, redis client = %v; want memory and none", l.Backend(), a.redis)
+			if l.Backend() != "memory" || r.Backend() != "memory" || a.redis != nil {
+				t.Errorf("backends = %s, %s, redis client = %v; want memory and none", l.Backend(), r.Backend(), a.redis)
 			}
 		})
 	}
 }
 
 func TestNewLimiterRejectsBadRate(t *testing.T) {
-	cfg := validConfig(t)
-	cfg.Modules.Auth.Security.LoginRateLimit = "nonsense"
-	if _, err := (&App{cfg: cfg, log: logger.NewNoOp()}).newLimiter(); err == nil {
-		t.Error("newLimiter accepted a malformed rate")
+	for _, mutate := range []func(c *Config){
+		func(c *Config) { c.Modules.Auth.Security.LoginRateLimit = "nonsense" },
+		func(c *Config) { c.Modules.Auth.Security.RefreshRateLimit = "nonsense" },
+	} {
+		cfg := validConfig(t)
+		mutate(&cfg)
+		if _, _, err := (&App{cfg: cfg, log: logger.NewNoOp()}).newLimiters(); err == nil {
+			t.Error("newLimiters accepted a malformed rate")
+		}
 	}
 }

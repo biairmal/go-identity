@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/module/auth/password"
-	"github.com/biairmal/go-identity/internal/module/auth/token"
 	"github.com/biairmal/go-identity/internal/platform/apierr"
 	"github.com/biairmal/go-identity/internal/platform/clock"
 )
@@ -51,11 +50,10 @@ type Logins struct {
 	v        validator.Validator
 	users    Users
 	tenants  Tenants
-	roles    Roles
 	sessions Sessions
 	audit    AuditWriter
 	limiter  Limiter
-	tokens   *token.Builder
+	issue    *tokenIssuer
 	clock    clock.Clock
 	log      logger.Logger
 	// dummyHash is verified against when the address has no account or no
@@ -294,7 +292,7 @@ func (s *Logins) complete(ctx context.Context, si *signIn) (*TokenResponse, erro
 		}
 		var err error
 		if a.MustChangePassword {
-			resp, err = s.restrictedResponse(ctx, si)
+			resp, err = s.issue.restricted(ctx, si.account, si.tenant)
 		} else {
 			resp, err = s.sessionResponse(ctx, si)
 		}
@@ -314,69 +312,14 @@ func (s *Logins) complete(ctx context.Context, si *signIn) (*TokenResponse, erro
 	return resp, nil
 }
 
-// restrictedResponse is the token response of a forced password change: a
-// short-lived token scoped to the password change, no refresh token.
-func (s *Logins) restrictedResponse(ctx context.Context, si *signIn) (*TokenResponse, error) {
-	signed, expiry, err := s.tokens.Access(ctx, &token.Subject{
-		UserID: si.account.ID, Scope: token.ScopePasswordChange, TTL: restrictedTokenTTL,
-	}, si.tenant.ID)
-	if err != nil {
-		return nil, err
-	}
-	return s.response(si, signed, expiry), nil
-}
-
 // sessionResponse starts a refresh-token family and signs a full access token
 // with the user's roles in the tenant.
 func (s *Logins) sessionResponse(ctx context.Context, si *signIn) (*TokenResponse, error) {
-	a := si.account
-	sub := &token.Subject{UserID: a.ID, SuperAdmin: a.IsSuperAdmin}
-	var err error
-	if sub.Roles, err = s.roles.RoleNames(ctx, si.tenant.ID, a.ID); err != nil {
-		return nil, err
-	}
-	if s.cfg.Token.Claims == ClaimsRolesAndPermissions {
-		if sub.Permissions, err = s.roles.Permissions(ctx, si.tenant.ID, a.ID); err != nil {
-			return nil, err
-		}
-	}
-	issued, err := s.sessions.Issue(ctx, a.ID, si.tenant.ID, si.device)
+	issued, err := s.sessions.Issue(ctx, si.account.ID, si.tenant.ID, si.device)
 	if err != nil {
 		return nil, err
 	}
-	signed, expiry, err := s.tokens.Access(ctx, sub, si.tenant.ID)
-	if err != nil {
-		return nil, err
-	}
-	resp := s.response(si, signed, expiry)
-	resp.RefreshToken = issued.Raw
-	resp.RefreshExpiresIn = seconds(issued.ExpiresAt.Sub(s.clock.Now()))
-	return resp, nil
-}
-
-// response fills the fields every token response shares.
-func (s *Logins) response(si *signIn, accessToken string, expiry time.Time) *TokenResponse {
-	a := si.account
-	return &TokenResponse{
-		AccessToken: accessToken,
-		TokenType:   tokenTypeBearer,
-		ExpiresIn:   seconds(expiry.Sub(s.clock.Now())),
-		User: UserSummaryResponse{
-			ID: a.ID.String(), DisplayName: a.DisplayName, Email: a.Email,
-		},
-		Tenant:             tenantSummary(si.tenant),
-		MustChangePassword: a.MustChangePassword,
-	}
-}
-
-// tenantSummary is the response view of a tenant.
-func tenantSummary(t *TenantInfo) TenantSummaryResponse {
-	return TenantSummaryResponse{ID: t.ID.String(), Slug: t.Slug, Name: t.Name}
-}
-
-// seconds rounds a duration to whole seconds for expires_in fields.
-func seconds(d time.Duration) int {
-	return int(d.Round(time.Second) / time.Second)
+	return s.issue.session(ctx, si.account, si.tenant, issued)
 }
 
 // truncateUserAgent caps a client-supplied user agent at maxUserAgent bytes,

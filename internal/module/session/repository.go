@@ -52,6 +52,14 @@ func (r *Repository) LockByHash(ctx context.Context, hash []byte) (*Token, error
 	return scanToken(row)
 }
 
+// ByHash reads one token without locking it, for sign-out, which only needs
+// to know whose token it is.
+func (r *Repository) ByHash(ctx context.Context, hash []byte) (*Token, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT `+tokenColumns+` FROM refresh_tokens WHERE token_hash = $1`, hash)
+	return scanToken(row)
+}
+
 // MarkRotated stamps a token as exchanged at the given time.
 func (r *Repository) MarkRotated(ctx context.Context, id uuid.UUID, at time.Time) error {
 	_, err := database.Leader(ctx, r.db).ExecContext(ctx,
