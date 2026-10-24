@@ -82,10 +82,10 @@ func TestUserState(t *testing.T) {
 	}
 }
 
-// TestNewResponseCarriesNoSecret pins the DTO's field set: the response must
+// TestNewUserResponseCarriesNoSecret pins the DTO's field set: the response must
 // expose the account's state without the lockout counters or the super admin
 // flag, which are internal.
-func TestNewResponseCarriesNoSecret(t *testing.T) {
+func TestNewUserResponseCarriesNoSecret(t *testing.T) {
 	verified := testTime()
 	u := &User{
 		ID:              uuid.New(),
@@ -98,15 +98,15 @@ func TestNewResponseCarriesNoSecret(t *testing.T) {
 		LockedUntil:     &verified,
 		Version:         3,
 	}
-	got := NewResponse(u)
+	got := NewUserResponse(u)
 	if got.ID != u.ID.String() || got.Email != u.Email || got.Status != StatusActive {
-		t.Errorf("NewResponse() = %+v, want the identity fields of %+v", got, u)
+		t.Errorf("NewUserResponse() = %+v, want the identity fields of %+v", got, u)
 	}
 	if !got.EmailVerified {
-		t.Error("NewResponse().EmailVerified = false, want true for a verified user")
+		t.Error("NewUserResponse().EmailVerified = false, want true for a verified user")
 	}
 	if got.Version != u.Version {
-		t.Errorf("NewResponse().Version = %d, want %d", got.Version, u.Version)
+		t.Errorf("NewUserResponse().Version = %d, want %d", got.Version, u.Version)
 	}
 	marshaled, err := json.Marshal(got)
 	if err != nil {

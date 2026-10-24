@@ -2,14 +2,14 @@ package user
 
 import "time"
 
-// Response is the user shape the API returns. It is a separate type from the
+// UserResponse is the user shape the API returns. It is a separate type from the
 // row struct on purpose: the row gains columns that must not leak (the lock
 // counters, the super admin flag's neighbors), and a DTO makes every added
 // field an explicit decision.
 //
 // The admin list adds the caller's tenant membership and roles, which come
 // from other modules and arrive with the admin user endpoints.
-type Response struct {
+type UserResponse struct { //nolint:revive // named for its resource: the package will hold other response DTOs
 	ID                 string     `json:"id"`
 	Email              string     `json:"email"`
 	DisplayName        string     `json:"display_name"`
@@ -21,9 +21,9 @@ type Response struct {
 	Version            int        `json:"version"`
 }
 
-// NewResponse maps a user row to its API shape.
-func NewResponse(u *User) Response {
-	return Response{
+// NewUserResponse maps a user row to its API shape.
+func NewUserResponse(u *User) UserResponse {
+	return UserResponse{
 		ID:                 u.ID.String(),
 		Email:              u.Email,
 		DisplayName:        u.DisplayName,
