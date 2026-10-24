@@ -65,18 +65,6 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 		Audit: rbacAudit{w: auditModule.Writer()},
 	})
 
-	// auth loads the signing keys, so it is the one module whose New can
-	// fail: a service that cannot sign a token must not start.
-	authModule, err := identityauth.New(&cfg.Modules.Auth, identityauth.Deps{
-		DB:      deps.DB,
-		Log:     deps.Log,
-		Clock:   clock.System{},
-		Tenancy: cfg.Modules.Tenant.Mode,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
 	sessionModule := session.New(cfg.Modules.Session, session.Deps{
 		DB:    deps.DB,
 		Log:   deps.Log,
@@ -84,6 +72,24 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 	})
 
 	userModule, err := newUserModule(cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// auth loads the signing keys, so a service that cannot sign a token
+	// does not start.
+	authModule, err := identityauth.New(&cfg.Modules.Auth, &identityauth.Deps{
+		DB:      deps.DB,
+		Log:     deps.Log,
+		Clock:   clock.System{},
+		Tenancy: cfg.Modules.Tenant.Mode,
+		V:       deps.V,
+		Outbox:  deps.Outbox,
+		Users:   authUsers{svc: userModule.Service()},
+		Tenants: tenantMemberships{svc: tenantModule.Service()},
+		Roles:   authRoles{svc: rbacModule.Service()},
+		Audit:   authAudit{w: auditModule.Writer()},
+	})
 	if err != nil {
 		return nil, nil, err
 	}

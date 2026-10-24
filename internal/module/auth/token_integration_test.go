@@ -18,7 +18,7 @@ import (
 // testModule builds the auth module over generated keys, with no database.
 func testModule(t *testing.T, cfg *Config) *Module {
 	t.Helper()
-	m, err := New(cfg, Deps{Clock: testkit.NewClock(time.Now())})
+	m, err := New(cfg, &Deps{Clock: testkit.NewClock(time.Now())})
 	if err != nil {
 		t.Fatalf("New() = %v", err)
 	}
@@ -275,7 +275,7 @@ func TestNewFailsWithoutKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := Default()
 			cfg.Token.SigningKeysDir = tt.setup(t)
-			if _, err := New(&cfg, Deps{}); err == nil {
+			if _, err := New(&cfg, &Deps{}); err == nil {
 				t.Fatal("New() = nil, want an error so startup stops")
 			}
 		})

@@ -32,7 +32,7 @@ func newUserModule(
 		Clock:       clock.System{},
 		EmailCipher: cipher,
 		Passwords:   userPasswords{},
-		Memberships: userMemberships{svc: tenants},
+		Memberships: tenantMemberships{svc: tenants},
 		Sessions:    sessions,
 		Audit:       userAudit{w: auditModule.Writer()},
 	}), nil

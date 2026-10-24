@@ -79,7 +79,7 @@ func TestAuthConfigReflectsConfig(t *testing.T) {
 			if err := cfg.Validate(); err != nil {
 				t.Fatalf("test config invalid: %v", err)
 			}
-			m, err := New(cfg, Deps{Clock: testkit.NewClock(time.Now()), Tenancy: tt.tenancy})
+			m, err := New(cfg, &Deps{Clock: testkit.NewClock(time.Now()), Tenancy: tt.tenancy})
 			if err != nil {
 				t.Fatalf("New() = %v", err)
 			}
@@ -107,7 +107,7 @@ func TestAuthConfigHasNoSecret(t *testing.T) {
 		AllowedDomains: []string{"example.com"},
 	}
 	cfg.ServiceClients = []ServiceClient{{ID: "svc", SecretHash: "hash-value"}}
-	m, err := New(cfg, Deps{Clock: testkit.NewClock(time.Now()), Tenancy: "multi"})
+	m, err := New(cfg, &Deps{Clock: testkit.NewClock(time.Now()), Tenancy: "multi"})
 	if err != nil {
 		t.Fatalf("New() = %v", err)
 	}

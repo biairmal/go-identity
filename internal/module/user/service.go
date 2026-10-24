@@ -29,10 +29,10 @@ func NewService(cfg Config, repo *Repository, creds *CredentialsRepository, log 
 
 // Create stores a user and, when passwordHash is not empty, its credentials
 // in one transaction, so an account never exists without the password it was
-// created with.
+// created with. It joins the caller's transaction when there is one.
 func (s *Service) Create(ctx context.Context, p *CreateParams, passwordHash string) (*User, error) {
 	var u *User
-	err := database.WithTx(ctx, s.repo.db, func(ctx context.Context) error {
+	err := database.InTx(ctx, s.repo.db, func(ctx context.Context) error {
 		var err error
 		if u, err = s.repo.Create(ctx, p); err != nil {
 			return err
@@ -90,8 +90,9 @@ func (s *Service) RecordSignIn(ctx context.Context, id uuid.UUID, at time.Time) 
 }
 
 // VerifyEmail stamps the email as confirmed and activates a pending account.
+// It joins the caller's transaction when there is one.
 func (s *Service) VerifyEmail(ctx context.Context, u *User, at time.Time) error {
-	return database.WithTx(ctx, s.repo.db, func(ctx context.Context) error {
+	return database.InTx(ctx, s.repo.db, func(ctx context.Context) error {
 		if err := s.repo.MarkEmailVerified(ctx, u.ID, at); err != nil {
 			return err
 		}
