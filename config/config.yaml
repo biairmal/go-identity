@@ -50,6 +50,10 @@ auth:                                         # enabled + auth.Config
     audience: ${AUTH_AUDIENCE:api}
   cache_ttl: 30s
 
+crypto:                                       # field encryption for stored emails (go-sdk crypto)
+  encryption_key: ${EMAIL_ENCRYPTION_KEY:}    # base64, 32 bytes; required outside local
+  blind_index_key: ${EMAIL_BLIND_INDEX_KEY:}  # base64, >=16 bytes, distinct from the above
+
 tracing:                                      # enabled + tracer.Config
   enabled: ${TRACING_ENABLED:false}
   endpoint: ${OTEL_ENDPOINT:localhost:4317}

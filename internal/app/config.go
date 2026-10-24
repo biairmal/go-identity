@@ -38,6 +38,7 @@ type Config struct {
 	Database  sqlkit.Config    `mapstructure:"database"`
 	Redis     RedisConfig      `mapstructure:"redis"`
 	Auth      AuthConfig       `mapstructure:"auth"`
+	Crypto    CryptoConfig     `mapstructure:"crypto"`
 	Tracing   TracingConfig    `mapstructure:"tracing"`
 	Metrics   MetricsConfig    `mapstructure:"metrics"`
 	Validator validator.Config `mapstructure:"validator"`
@@ -124,6 +125,7 @@ func (c *Config) sections() []section {
 		{"database", c.Database.Validate},
 		{"redis", c.validateRedis},
 		{"auth", c.validateAuth},
+		{"crypto", c.validateCrypto},
 		{"tracing", c.validateTracing},
 		{"metrics", c.validateMetrics},
 		{"validator", c.Validator.Validate},

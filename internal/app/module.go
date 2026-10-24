@@ -11,6 +11,7 @@ import (
 	"github.com/biairmal/go-identity/internal/module/rbac"
 	"github.com/biairmal/go-identity/internal/module/session"
 	"github.com/biairmal/go-identity/internal/module/tenant"
+	"github.com/biairmal/go-identity/internal/module/user"
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
@@ -41,6 +42,7 @@ type services struct {
 	rbac    *rbac.Service
 	auth    *identityauth.Module
 	session *session.Service
+	user    *user.Service
 }
 
 // buildModules constructs every module and returns them together with the
@@ -79,11 +81,24 @@ func buildModules(cfg *Config, deps Deps) ([]Module, *services, error) {
 		Clock: clock.System{},
 	})
 
-	modules := []Module{auditModule, tenantModule, rbacModule, authModule, sessionModule}
+	// The email cipher is built here, not inside user: the module declares
+	// the port and app owns the go-sdk crypto adapter behind it.
+	cipher, err := newEmailCipher(cfg, deps.Log)
+	if err != nil {
+		return nil, nil, err
+	}
+	userModule := user.New(cfg.Modules.User, user.Deps{
+		DB:          deps.DB,
+		Log:         deps.Log,
+		EmailCipher: cipher,
+	})
+
+	modules := []Module{auditModule, tenantModule, rbacModule, authModule, sessionModule, userModule}
 	return modules, &services{
 		tenant:  tenantModule.Service(),
 		rbac:    rbacModule.Service(),
 		auth:    authModule,
 		session: sessionModule.Service(),
+		user:    userModule.Service(),
 	}, nil
 }
