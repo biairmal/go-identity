@@ -1,0 +1,10 @@
+You have been invited
+
+{{with .InviterName}}{{.}} has invited you{{else}}You have been invited{{end}}
+to join {{with .TenantName}}{{.}}{{else}}the workspace{{end}}.
+
+Open this link to accept the invitation:
+
+{{.Link}}
+
+The link can be used once and expires in 7 days.

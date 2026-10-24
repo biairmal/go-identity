@@ -9,6 +9,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 
 	"github.com/biairmal/go-identity/internal/module/auth/keys"
+	"github.com/biairmal/go-identity/internal/module/auth/onetime"
 	"github.com/biairmal/go-identity/internal/module/auth/token"
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
@@ -22,6 +23,7 @@ type Module struct {
 	keys    *keys.Set
 	tokens  *token.Builder
 	keyRepo *KeyRepository
+	onetime *onetime.Service
 	log     logger.Logger
 }
 
@@ -54,12 +56,18 @@ func New(cfg *Config, deps Deps) (*Module, error) {
 	}
 	return &Module{
 		cfg: *cfg, keys: set, tokens: builder,
-		keyRepo: NewKeyRepository(deps.DB), log: log,
+		keyRepo: NewKeyRepository(deps.DB),
+		onetime: onetime.NewService(onetime.NewRepository(deps.DB), deps.Clock),
+		log:     log,
 	}, nil
 }
 
 // Tokens is the access-token builder, used by the sign-in flows.
 func (m *Module) Tokens() *token.Builder { return m.tokens }
+
+// OneTime issues and consumes the single-use tokens the email flows put in
+// their links.
+func (m *Module) OneTime() *onetime.Service { return m.onetime }
 
 // SyncKeys records the loaded keys and their statuses, so an operator can see
 // which keys this deployment publishes. internal/app calls it at startup.
