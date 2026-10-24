@@ -92,7 +92,7 @@ func (s *PasswordResets) Reset(ctx context.Context, in *ResetPasswordRequest) er
 	if err := s.v.ValidateStruct(in); err != nil {
 		return err
 	}
-	if err := checkPassword(in.Password, s.cfg.Providers.Password.MinLength); err != nil {
+	if err := checkPassword("password", in.Password, s.cfg.Providers.Password.MinLength); err != nil {
 		return err
 	}
 	hash, err := password.Hash(in.Password)

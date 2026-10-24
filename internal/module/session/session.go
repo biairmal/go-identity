@@ -42,3 +42,15 @@ type Device struct {
 	UserAgent string
 	IP        string
 }
+
+// Session is one signed-in device as the session list shows it: a family and
+// its live token.
+type Session struct {
+	FamilyID uuid.UUID
+	// CreatedAt is when the device signed in.
+	CreatedAt time.Time
+	// LastUsedAt is when the device last refreshed (or signed in).
+	LastUsedAt time.Time
+	UserAgent  string
+	IP         *string
+}

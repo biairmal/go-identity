@@ -72,7 +72,7 @@ func (s *Registrations) Register(ctx context.Context, in *RegisterRequest) error
 	if err := s.v.ValidateStruct(in); err != nil {
 		return err
 	}
-	if err := checkPassword(in.Password, s.cfg.Providers.Password.MinLength); err != nil {
+	if err := checkPassword("password", in.Password, s.cfg.Providers.Password.MinLength); err != nil {
 		return err
 	}
 	tenantID, err := s.signUpTenant(ctx, in.Tenant)
@@ -103,9 +103,9 @@ func (s *Registrations) Register(ctx context.Context, in *RegisterRequest) error
 }
 
 // checkPassword maps a policy failure onto PASSWORD_POLICY with a message for
-// the password field. minLength is the configured minimum, which may be
+// the named field. minLength is the configured minimum, which may be
 // stricter than the policy's own floor.
-func checkPassword(plain string, minLength int) error {
+func checkPassword(field, plain string, minLength int) error {
 	err := password.Validate(plain)
 	if err == nil && utf8.RuneCountInString(plain) < minLength {
 		err = password.ErrTooShort
@@ -124,7 +124,7 @@ func checkPassword(plain string, minLength int) error {
 	default:
 		msg = "is not valid UTF-8"
 	}
-	return apierr.WithFields(apierr.ReasonPasswordPolicy, map[string]string{"password": msg})
+	return apierr.WithFields(apierr.ReasonPasswordPolicy, map[string]string{field: msg})
 }
 
 // signUpTenant is the tenant a sign-up joins: the default tenant in single

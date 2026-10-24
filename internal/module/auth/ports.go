@@ -31,6 +31,8 @@ type Users interface {
 	// UpdatePasswordHash stores a new hash of the same password, after a
 	// rehash with stronger parameters. A forced password change stays.
 	UpdatePasswordHash(ctx context.Context, id uuid.UUID, hash string) error
+	// SetDisplayName renames the account.
+	SetDisplayName(ctx context.Context, id uuid.UUID, name string) error
 	// SetPassword stores a newly chosen password and clears a forced password
 	// change.
 	SetPassword(ctx context.Context, id uuid.UUID, hash string) error
@@ -208,14 +210,16 @@ type AuditEvent struct {
 
 // Audit action names this module writes.
 const (
-	ActionRegister      = "auth.register"
-	ActionEmailVerified = "auth.email_verified"
-	ActionLogin         = "auth.login"
-	ActionLoginFailed   = "auth.login_failed"
-	ActionLogout        = "auth.logout"
-	ActionLogoutAll     = "auth.logout_all"
-	ActionRefreshReuse  = "auth.refresh_reuse"
-	ActionPasswordReset = "auth.password_reset"
+	ActionRegister       = "auth.register"
+	ActionEmailVerified  = "auth.email_verified"
+	ActionLogin          = "auth.login"
+	ActionLoginFailed    = "auth.login_failed"
+	ActionLogout         = "auth.logout"
+	ActionLogoutAll      = "auth.logout_all"
+	ActionRefreshReuse   = "auth.refresh_reuse"
+	ActionPasswordReset  = "auth.password_reset"
+	ActionPasswordChange = "auth.password_change"
+	ActionIdentityUnlink = "identity.unlink"
 )
 
 // TargetUser is the target type of the events above.

@@ -116,3 +116,38 @@ type TenantChoiceResponse struct {
 
 // tokenTypeBearer is the token_type of every access token.
 const tokenTypeBearer = "Bearer"
+
+// MeResponse is the signed-in user in GET and PATCH /v1/me.
+type MeResponse struct {
+	ID            string                `json:"id"`
+	Email         string                `json:"email"`
+	DisplayName   string                `json:"display_name"`
+	EmailVerified bool                  `json:"email_verified"`
+	IsSuperAdmin  bool                  `json:"is_super_admin"`
+	Tenant        TenantSummaryResponse `json:"tenant"`
+	Roles         []string              `json:"roles"`
+	Permissions   []string              `json:"permissions"`
+	// Providers are the sign-in methods the account has: a password, a
+	// linked Google identity.
+	Providers ProvidersResponse `json:"providers"`
+}
+
+// UpdateMeRequest is the body of PATCH /v1/me.
+type UpdateMeRequest struct {
+	DisplayName string `json:"display_name" validate:"required,min=1,max=100"`
+}
+
+// ChangePasswordRequest is the body of POST /v1/me/password. CurrentPassword
+// is omitted with the restricted token or when the account has no password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" validate:"max=1024"`
+	NewPassword     string `json:"new_password" validate:"required"`
+}
+
+// TenantResponse is a tenant in GET /v1/me/tenants, with its status.
+type TenantResponse struct {
+	ID     string `json:"id"`
+	Slug   string `json:"slug"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
