@@ -20,9 +20,10 @@ import (
 
 // Deps are the shared dependencies handed to every module's New.
 type Deps struct {
-	DB     *sqlkit.DB
-	Log    logger.Logger
-	V      validator.Validator
+	DB  *sqlkit.DB
+	Log logger.Logger
+	V   validator.Validator
+	// Authz is the database-backed permission check for the admin routes.
 	Authz  authz.Authorizer
 	Outbox *database.Outbox
 	// Limiter rate-limits the public sign-in and sign-up routes; nil turns
@@ -58,7 +59,7 @@ type services struct {
 // here. The order is the one modules are registered in, not a dependency
 // order: modules never depend on each other directly, only through ports.
 func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
-	auditModule := audit.New(audit.Deps{DB: deps.DB, Log: deps.Log})
+	auditModule := audit.New(audit.Deps{DB: deps.DB, Log: deps.Log, Authz: deps.Authz})
 
 	tenantModule := tenant.New(cfg.Modules.Tenant, tenant.Deps{
 		DB:    deps.DB,

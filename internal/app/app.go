@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 
 	"github.com/biairmal/go-sdk/lib/auth"
-	"github.com/biairmal/go-sdk/lib/authz"
 	"github.com/biairmal/go-sdk/lib/ctxkit"
 	"github.com/biairmal/go-sdk/lib/httpkit/middleware"
 	"github.com/biairmal/go-sdk/lib/lifecycle"
@@ -25,6 +24,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
+	"github.com/biairmal/go-identity/internal/module/rbac"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/ratelimit"
 	"github.com/biairmal/go-identity/internal/platform/requestip"
@@ -81,7 +81,7 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 		return nil, err
 	}
 	deps := Deps{
-		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: authz.NewNoOp(),
+		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: rbac.NewAuthorizer(db),
 		Outbox: database.NewOutbox(db), Limiter: limiter, RefreshLimiter: refreshLimiter,
 	}
 	modules, svc, err := buildModules(&a.cfg, &deps)
