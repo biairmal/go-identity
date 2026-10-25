@@ -59,3 +59,32 @@ func TestUnknownRoutesUseErrorEnvelope(t *testing.T) {
 		}
 	}
 }
+
+func TestSwaggerNeedsBasicAuth(t *testing.T) {
+	a := &App{cfg: Config{Swagger: SwaggerConfig{Enabled: true, Username: "u", Password: "p"}}}
+	srv := testkit.Server(t, a.routes(nil, nil))
+	for _, tc := range []struct {
+		name, user, pass string
+		status           int
+	}{
+		{"no credentials", "", "", http.StatusUnauthorized},
+		{"wrong password", "u", "x", http.StatusUnauthorized},
+		{"right credentials", "u", "p", http.StatusOK},
+	} {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/swagger/doc.json", http.NoBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.user != "" {
+			req.SetBasicAuth(tc.user, tc.pass)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != tc.status {
+			t.Errorf("%s: status = %d, want %d", tc.name, resp.StatusCode, tc.status)
+		}
+	}
+}
