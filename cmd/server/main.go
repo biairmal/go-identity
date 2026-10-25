@@ -17,6 +17,18 @@ const (
 	configFile = "config/config.yaml"
 )
 
+// General API info for swag (make swagger-generate).
+//
+//	@title			go-identity API
+//	@version		1.0
+//	@description	Sign-in service and the only issuer of tokens: password sign-in, sessions and profiles.
+//	@BasePath		/
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				"Bearer" followed by a space and the access token from POST /v1/auth/login.
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

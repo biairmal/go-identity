@@ -41,6 +41,7 @@ type Config struct {
 	Crypto    CryptoConfig     `mapstructure:"crypto"`
 	Tracing   TracingConfig    `mapstructure:"tracing"`
 	Metrics   MetricsConfig    `mapstructure:"metrics"`
+	Swagger   SwaggerConfig    `mapstructure:"swagger"`
 	Validator validator.Config `mapstructure:"validator"`
 	Lifecycle lifecycle.Config `mapstructure:"lifecycle"`
 	Modules   Modules          `mapstructure:"modules"`
@@ -108,6 +109,11 @@ type MetricsConfig struct {
 	Enabled        bool   `mapstructure:"enabled"`
 	Path           string `mapstructure:"path"`
 	metrics.Config `mapstructure:",squash"`
+}
+
+// SwaggerConfig toggles the generated API docs served at /swagger/index.html.
+type SwaggerConfig struct {
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // section is one named block of configuration that can validate itself.

@@ -2,9 +2,12 @@
 
 COMPOSE := docker compose -f deploy/compose/docker-compose.yaml
 COVERAGE_OUT := out/coverage.out
+SWAG := go run github.com/swaggo/swag/cmd/swag@v1.16.6
+SWAGGER_DIR := api/swagger
+BIN := bin/server
 
 .DEFAULT_GOAL := help
-.PHONY: help up down run test test-integration lint format format-check coverage vulncheck check \
+.PHONY: help up down run build swagger test test-integration lint format format-check coverage vulncheck check \
 	migrate-up migrate-down migrate-create keys openapi-lint openapi-mock
 
 help: ## Show targets
@@ -19,7 +22,13 @@ down: ## Stop the local stack
 keys: ## Generate a local signing key (development only; real envs mount a secret)
 	bash scripts/gen-dev-keys.sh ./keys
 
-run: keys ## Run the API against the local stack
+swagger: ## Generate Swagger docs from handler annotations into api/swagger
+	$(SWAG) init -g cmd/server/main.go -o $(SWAGGER_DIR) --packageName swagger --outputTypes go,json --parseDependency --parseInternal
+
+build: swagger ## Generate Swagger docs, then build bin/server
+	go build -o $(BIN) ./cmd/server
+
+run: keys swagger ## Generate Swagger docs, then run the API against the local stack
 	SIGNING_KEYS_DIR=./keys go run ./cmd/server serve
 
 test: ## Unit tests

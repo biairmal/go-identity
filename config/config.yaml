@@ -43,6 +43,7 @@ auth:                                         # enabled + auth.Config
     - { pattern: /readyz, public: true }
     - { pattern: /version, public: true }
     - { pattern: /metrics, public: true }
+    - { method: GET, pattern: /swagger/**, public: true }   # generated API docs (swagger.enabled)
     - { method: GET, pattern: /.well-known/jwks.json, public: true }  # token verification keys
     - { method: GET, pattern: /v1/auth/config, public: true }   # sign-in screen settings
     - { method: POST, pattern: /v1/auth/login, public: true }
@@ -75,6 +76,9 @@ metrics:                                      # enabled + path + metrics.Config
   enabled: ${METRICS_ENABLED:true}
   path: /metrics
   namespace: ${METRICS_NAMESPACE:identity}
+
+swagger:
+  enabled: ${SWAGGER_ENABLED:true}            # false to hide the API docs
 
 validator:
   field_name_tag: json
