@@ -123,6 +123,24 @@ func (s *Service) EnsureActiveMember(ctx context.Context, tenantID, userID uuid.
 	})
 }
 
+// RemoveMember marks a membership removed and records who did it. The row
+// stays, so the user's history in the tenant remains readable.
+func (s *Service) RemoveMember(ctx context.Context, tenantID, userID, actorID uuid.UUID) error {
+	m, err := s.repo.Member(ctx, tenantID, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SetMemberStatus(ctx, tenantID, userID, MemberRemoved); err != nil {
+		return err
+	}
+	return s.writeAudit(ctx, &AuditEvent{
+		TenantID: tenantID, ActorID: actorID, Action: ActionMemberRemove,
+		TargetType: TargetMembership, TargetID: userID.String(),
+		Before: map[string]any{"status": m.Status},
+		After:  map[string]any{"status": MemberRemoved},
+	})
+}
+
 // Member returns one membership.
 func (s *Service) Member(ctx context.Context, tenantID, userID uuid.UUID) (*Member, error) {
 	return s.repo.Member(ctx, tenantID, userID)

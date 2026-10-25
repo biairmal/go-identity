@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/module/audit"
+	"github.com/biairmal/go-identity/internal/module/rbac"
 	"github.com/biairmal/go-identity/internal/module/session"
 	"github.com/biairmal/go-identity/internal/module/tenant"
 	"github.com/biairmal/go-identity/internal/module/user"
@@ -16,11 +17,12 @@ import (
 )
 
 // newUserModule builds the user module with its ports wired over the audit,
-// tenant and session modules. The email cipher is built here, not inside
+// tenant, session and rbac modules. The email cipher is built here, not inside
 // user: the module declares the port and app owns the go-sdk crypto adapter
 // behind it.
 func newUserModule(
 	cfg *Config, deps *Deps, auditModule *audit.Module, tenants *tenant.Service, sessions *session.Service,
+	rbacModule *rbac.Module,
 ) (*user.Module, error) {
 	cipher, err := newEmailCipher(cfg, deps.Log)
 	if err != nil {
@@ -35,6 +37,8 @@ func newUserModule(
 		Memberships: tenantMemberships{svc: tenants},
 		Sessions:    sessions,
 		Audit:       userAudit{w: auditModule.Writer()},
+		Roles:       userRoles{svc: rbacModule.Service()},
+		Authz:       rbacModule.Authorizer(),
 	}), nil
 }
 
@@ -93,8 +97,9 @@ func superAdminsOver(cfg *Config, db *sqlkit.DB, log logger.Logger) (*user.Super
 	tenants := tenant.New(cfg.Modules.Tenant, tenant.Deps{
 		DB: db, Log: log, Audit: tenantAudit{w: auditModule.Writer()},
 	}).Service()
-	sessions := session.New(cfg.Modules.Session, session.Deps{DB: db, Log: log, Clock: clock.System{}}).Service()
-	m, err := newUserModule(cfg, deps, auditModule, tenants, sessions)
+	sessions := session.New(cfg.Modules.Session, &session.Deps{DB: db, Log: log, Clock: clock.System{}}).Service()
+	rbacModule := rbac.New(cfg.Modules.RBAC, rbac.Deps{DB: db, Log: log})
+	m, err := newUserModule(cfg, deps, auditModule, tenants, sessions, rbacModule)
 	if err != nil {
 		return nil, err
 	}

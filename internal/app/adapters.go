@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/module/audit"
@@ -358,4 +359,57 @@ func (a sessionAudit) Write(ctx context.Context, e *session.AuditEvent) error {
 		TargetID:   e.TargetID,
 		After:      e.After,
 	})
+}
+
+// RemoveMember marks the user's membership of the tenant removed.
+func (m tenantMemberships) RemoveMember(ctx context.Context, tenantID, userID, actorID uuid.UUID) error {
+	return m.svc.RemoveMember(ctx, tenantID, userID, actorID)
+}
+
+// sessionMembers adapts the tenant service to the membership port session
+// declares.
+type sessionMembers struct{ svc *tenant.Service }
+
+// IsMember reports whether the user is an invited or active member.
+func (m sessionMembers) IsMember(ctx context.Context, tenantID, userID uuid.UUID) (bool, error) {
+	mb, err := m.svc.Member(ctx, tenantID, userID)
+	if errors.Is(err, errorz.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return mb.Status != tenant.MemberRemoved, nil
+}
+
+// userRoles adapts the rbac service to the roles port user declares.
+type userRoles struct{ svc *rbac.Service }
+
+// RolesOf returns the roles each user holds in the tenant.
+func (a userRoles) RolesOf(
+	ctx context.Context, tenantID uuid.UUID, userIDs []uuid.UUID,
+) (map[uuid.UUID][]user.RoleRef, error) {
+	held, err := a.svc.RolesOf(ctx, tenantID, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID][]user.RoleRef, len(held))
+	for id, refs := range held {
+		for _, r := range refs {
+			out[id] = append(out[id], user.RoleRef{ID: r.ID, Name: r.Name})
+		}
+	}
+	return out, nil
+}
+
+// RemoveAll removes the user's roles in the tenant.
+func (a userRoles) RemoveAll(ctx context.Context, tenantID, userID uuid.UUID) error {
+	return a.svc.RemoveUserRoles(ctx, tenantID, userID)
+}
+
+// GuardRoleManagers runs change under rbac's last-admin protection.
+func (a userRoles) GuardRoleManagers(
+	ctx context.Context, userID uuid.UUID, change func(context.Context) error,
+) error {
+	return a.svc.GuardRoleManagers(ctx, userID, change)
 }

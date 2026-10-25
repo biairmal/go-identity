@@ -1,6 +1,9 @@
 package rbac
 
-import "github.com/biairmal/go-sdk/lib/common/dto"
+import (
+	"github.com/biairmal/go-sdk/lib/common/dto"
+	"github.com/google/uuid"
+)
 
 // RolePageResponse is the data of GET /v1/admin/roles.
 type RolePageResponse = dto.PageResponse[RoleSummaryResponse]
@@ -55,6 +58,23 @@ type SetPermissionsRequest struct {
 	Permissions []string `json:"permissions" validate:"required"`
 	// Version stands in for the If-Match header.
 	Version *int `json:"version"`
+}
+
+// SetUserRolesRequest is the body of PUT /v1/admin/users/{id}/roles: the full
+// set of roles the user holds in the tenant afterwards.
+type SetUserRolesRequest struct {
+	RoleIDs []uuid.UUID `json:"role_ids" validate:"required"`
+}
+
+// RoleRefResponse names one role a user holds.
+type RoleRefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// UserRolesResponse is the data of PUT /v1/admin/users/{id}/roles.
+type UserRolesResponse struct {
+	Roles []RoleRefResponse `json:"roles"`
 }
 
 // newRoleResponse builds the response for role granting keys.

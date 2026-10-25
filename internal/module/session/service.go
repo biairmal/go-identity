@@ -15,6 +15,7 @@ import (
 
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/scope"
 )
 
 // tokenBytes is the entropy of a refresh token: 256 bits, opaque, not a JWT.
@@ -43,6 +44,8 @@ type Service struct {
 	log   logger.Logger
 	// audit records sign-outs from the session list; set by New.
 	audit AuditWriter
+	// members checks the target of an admin revoke; set by New.
+	members Members
 }
 
 // NewService returns a Service. clk and log may be nil.
@@ -249,6 +252,39 @@ func (s *Service) SignOutDevice(ctx context.Context, userID, tenantID, familyID 
 			TenantID: tenantID, ActorID: userID, Action: ActionLogout,
 			TargetType: "user", TargetID: userID.String(),
 			After: map[string]any{"family_id": familyID.String(), "via": "session_list"},
+		})
+	})
+}
+
+// RevokeForMember signs a member of the caller's tenant out of every device
+// in that tenant, so role changes take effect before the access token
+// expires. Sessions in the user's other tenants are left alone. A user who
+// is not a member is 404.
+func (s *Service) RevokeForMember(ctx context.Context, userID uuid.UUID) error {
+	actorID, err := scope.User(ctx)
+	if err != nil {
+		return err
+	}
+	tenantID, err := scope.Tenant(ctx)
+	if err != nil {
+		return err
+	}
+	member, err := s.members.IsMember(ctx, tenantID, userID)
+	if err != nil {
+		return err
+	}
+	if !member {
+		return errorz.NotFound().WithMessage("session: user not found")
+	}
+	return database.WithTx(ctx, s.db, func(ctx context.Context) error {
+		n, err := s.repo.RevokeAllForUserInTenant(ctx, userID, tenantID, s.clock.Now())
+		if err != nil {
+			return err
+		}
+		return s.audit.Write(ctx, &AuditEvent{
+			TenantID: tenantID, ActorID: actorID, Action: ActionSessionsRevoke,
+			TargetType: "user", TargetID: userID.String(),
+			After: map[string]any{"revoked_tokens": n},
 		})
 	})
 }

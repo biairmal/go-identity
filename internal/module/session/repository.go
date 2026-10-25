@@ -98,6 +98,16 @@ func (r *Repository) RevokeAllForUser(ctx context.Context, userID uuid.UUID, at 
 	return nil
 }
 
+// RevokeAllForUserInTenant revokes every live token of one user in one
+// tenant and returns how many it revoked.
+func (r *Repository) RevokeAllForUserInTenant(
+	ctx context.Context, userID, tenantID uuid.UUID, at time.Time,
+) (int64, error) {
+	return r.revoke(ctx, "session: revoke tenant tokens",
+		`UPDATE refresh_tokens SET revoked_at = $3
+		 WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL`, userID, tenantID, at)
+}
+
 // ListSessions returns the live sessions of one user, one per family, most
 // recently used first. A family's live token is its newest, so its issue
 // time is when the device last refreshed; the family began with its oldest.
@@ -132,15 +142,20 @@ func (r *Repository) ListSessions(ctx context.Context, userID uuid.UUID, now tim
 // has a live token. It reports how many tokens it revoked, so zero means not
 // found as far as that user can tell.
 func (r *Repository) RevokeUserFamily(ctx context.Context, userID, familyID uuid.UUID, at time.Time) (int64, error) {
-	res, err := database.Leader(ctx, r.db).ExecContext(ctx,
+	return r.revoke(ctx, "session: revoke user family",
 		`UPDATE refresh_tokens SET revoked_at = $3
 		 WHERE family_id = $1 AND user_id = $2 AND revoked_at IS NULL`, familyID, userID, at)
+}
+
+// revoke runs a revoking update and returns how many tokens it revoked.
+func (r *Repository) revoke(ctx context.Context, what, query string, args ...any) (int64, error) {
+	res, err := database.Leader(ctx, r.db).ExecContext(ctx, query, args...)
 	if err != nil {
-		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: revoke user family")
+		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage(what)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("session: revoke user family")
+		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage(what)
 	}
 	return n, nil
 }

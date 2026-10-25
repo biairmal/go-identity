@@ -80,7 +80,7 @@ func (f *superAdminFixture) users(t *testing.T) *user.Service {
 
 // sessions returns the session service over the fixture database.
 func (f *superAdminFixture) sessions() *session.Service {
-	return session.New(f.cfg.Modules.Session, session.Deps{DB: f.db, Clock: clock.System{}}).Service()
+	return session.New(f.cfg.Modules.Session, &session.Deps{DB: f.db, Clock: clock.System{}}).Service()
 }
 
 // superAdmin returns the one flagged user.
