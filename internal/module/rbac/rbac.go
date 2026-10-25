@@ -19,6 +19,14 @@ type Role struct {
 	UpdatedAt   time.Time
 }
 
+// RoleSummary is a role with the number of permissions it grants and users
+// it is assigned to, for the admin role list.
+type RoleSummary struct {
+	Role
+	PermissionCount int
+	UserCount       int
+}
+
 // Template reports whether the role is a template rather than a tenant's own.
 func (r *Role) Template() bool { return r.TenantID == nil }
 

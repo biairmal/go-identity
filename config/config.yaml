@@ -153,7 +153,7 @@ modules:
     seed_on_start: true
     permissions:                              # catalog; services check these strings
       - { key: users:read,   description: View users }
-      - { key: users:manage, description: Invite, disable and assign roles to users }
+      - { key: users:manage, description: "Invite, disable and assign roles to users" }
       - { key: roles:manage, description: Create and edit roles }
       - { key: audit:read,   description: View the audit log }
     roles:                                    # seeded once into each tenant

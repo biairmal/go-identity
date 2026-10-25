@@ -16,6 +16,7 @@ import (
 
 	_ "github.com/biairmal/go-identity/api/swagger" // registers the generated spec with http-swagger
 	identitytoken "github.com/biairmal/go-identity/internal/module/auth/token"
+	"github.com/biairmal/go-identity/internal/module/rbac"
 	"github.com/biairmal/go-identity/internal/platform/apierr"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
 )
@@ -60,7 +61,10 @@ func groups(r chi.Router) httpx.Routes {
 	r.Route("/v1", func(v1 chi.Router) {
 		rt.API = v1
 		v1.Route("/me", func(g chi.Router) { rt.Me = g })
-		v1.Route("/admin", func(g chi.Router) { rt.Admin = g })
+		v1.Route("/admin", func(g chi.Router) {
+			g.Use(rbac.Memoize) // admin permission checks read the caller's grants once per request
+			rt.Admin = g
+		})
 		v1.Route("/internal", func(g chi.Router) { rt.Internal = g })
 	})
 	return rt

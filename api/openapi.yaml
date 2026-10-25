@@ -963,7 +963,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string, minLength: 1, maxLength: 50 }
-                description: { type: string }
+                description: { type: string, maxLength: 200 }
                 permissions:
                   type: array
                   items: { type: string }
@@ -1021,7 +1021,7 @@ paths:
               type: object
               properties:
                 name: { type: string, minLength: 1, maxLength: 50 }
-                description: { type: string }
+                description: { type: string, maxLength: 200 }
                 version:
                   type: integer
                   description: An alternative to the If-Match header.
@@ -1316,7 +1316,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string, minLength: 1, maxLength: 50 }
-                description: { type: string }
+                description: { type: string, maxLength: 200 }
                 permissions:
                   type: array
                   items: { type: string }
@@ -1353,7 +1353,7 @@ paths:
               type: object
               properties:
                 name: { type: string, minLength: 1, maxLength: 50 }
-                description: { type: string }
+                description: { type: string, maxLength: 200 }
                 permissions:
                   type: array
                   items: { type: string }

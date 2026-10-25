@@ -69,6 +69,7 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 	rbacModule := rbac.New(cfg.Modules.RBAC, rbac.Deps{
 		DB:    deps.DB,
 		Log:   deps.Log,
+		V:     deps.V,
 		Audit: rbacAudit{w: auditModule.Writer()},
 	})
 
