@@ -95,6 +95,9 @@ type Tenants interface {
 	Tenant(ctx context.Context, id uuid.UUID) (*TenantInfo, error)
 	// Memberships lists the tenants userID belongs to, in any status.
 	Memberships(ctx context.Context, userID uuid.UUID) ([]Membership, error)
+	// InviteMember makes userID an invited member of tenantID unless it is
+	// one already, and returns the previous status ("" for none).
+	InviteMember(ctx context.Context, tenantID, userID uuid.UUID) (string, error)
 }
 
 // TenantInfo is the part of a tenant sign-in reads.
@@ -111,6 +114,8 @@ type Membership struct {
 	Tenant TenantInfo
 	// Active is true when the membership allows acting in the tenant.
 	Active bool
+	// Status is the membership status: invited, active or removed.
+	Status string
 }
 
 // Roles grants roles by name. internal/app wires it over the rbac module.
@@ -122,6 +127,12 @@ type Roles interface {
 	RoleNames(ctx context.Context, tenantID, userID uuid.UUID) ([]string, error)
 	// Permissions is the union of the permissions of those roles.
 	Permissions(ctx context.Context, tenantID, userID uuid.UUID) ([]string, error)
+	// CheckGrantable refuses roles the caller may not hand out: unknown in
+	// the caller's tenant (400) or granting a permission the caller lacks.
+	CheckGrantable(ctx context.Context, roleIDs []uuid.UUID) error
+	// GrantRoles grants the tenant's roles among roleIDs, skipping deleted
+	// ones.
+	GrantRoles(ctx context.Context, tenantID, userID uuid.UUID, roleIDs []uuid.UUID, grantedBy *uuid.UUID) error
 }
 
 // Sessions starts, rotates and revokes refresh-token families. internal/app
@@ -210,6 +221,8 @@ type AuditEvent struct {
 
 // Audit action names this module writes.
 const (
+	ActionUserInvite     = "user.invite"
+	ActionInviteAccepted = "user.invite_accepted"
 	ActionRegister       = "auth.register"
 	ActionEmailVerified  = "auth.email_verified"
 	ActionLogin          = "auth.login"

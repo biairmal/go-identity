@@ -102,6 +102,7 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 		Roles:    authRoles{svc: rbacModule.Service()},
 		Sessions: authSessions{svc: sessionModule.Service()},
 		Audit:    authAudit{w: auditModule.Writer()},
+		Authz:    rbacModule.Authorizer(),
 	}
 	if deps.Limiter != nil {
 		// Assigned only when set, so the interface never holds a nil pointer.

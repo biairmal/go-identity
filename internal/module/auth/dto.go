@@ -1,5 +1,7 @@
 package auth
 
+import "github.com/google/uuid"
+
 // AuthConfigResponse is what the sign-in screen needs to render itself: the
 // enabled providers, whether self sign-up is open and the tenancy mode. It is
 // built from configuration only and carries nothing secret.
@@ -150,4 +152,38 @@ type TenantResponse struct {
 	Slug   string `json:"slug"`
 	Name   string `json:"name"`
 	Status string `json:"status"`
+}
+
+// InviteRequest is the body of POST /v1/admin/users/invite.
+type InviteRequest struct {
+	Email   string      `json:"email" validate:"required,email,max=254"`
+	RoleIDs []uuid.UUID `json:"role_ids" validate:"required"`
+	// DisplayName names a new account; an existing one keeps its own.
+	DisplayName string `json:"display_name" validate:"max=100"`
+}
+
+// InviteResponse is the 202 of POST /v1/admin/users/invite.
+type InviteResponse struct {
+	Status string `json:"status"`
+}
+
+// InvitePreviewResponse is GET /v1/auth/invite/{token}.
+type InvitePreviewResponse struct {
+	Tenant      InviteTenantResponse `json:"tenant"`
+	EmailMasked string               `json:"email_masked"`
+	HasPassword bool                 `json:"has_password"`
+}
+
+// InviteTenantResponse names the tenant an invite is for.
+type InviteTenantResponse struct {
+	Name string `json:"name"`
+}
+
+// AcceptInviteRequest is the body of POST /v1/auth/invite/accept.
+type AcceptInviteRequest struct {
+	Token string `json:"token" validate:"required,max=256"`
+	// Password is required only when the account has none; otherwise it is
+	// ignored, so an invite never changes an existing password.
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name" validate:"max=100"`
 }

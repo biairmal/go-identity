@@ -91,3 +91,19 @@ func (r *Repository) DeleteUnusedForUser(ctx context.Context, userID uuid.UUID, 
 	}
 	return nil
 }
+
+// DeleteUnusedForUserInTenant deletes a user's unused tokens of one purpose
+// scoped to one tenant, so a new invite replaces the previous one without
+// touching invites to other tenants.
+func (r *Repository) DeleteUnusedForUserInTenant(
+	ctx context.Context, userID, tenantID uuid.UUID, purpose string,
+) error {
+	_, err := database.Leader(ctx, r.db).ExecContext(ctx,
+		`DELETE FROM one_time_tokens
+		 WHERE user_id = $1 AND tenant_id = $2 AND purpose = $3 AND used_at IS NULL`,
+		userID, tenantID, purpose)
+	if err != nil {
+		return errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("onetime: delete unused tokens")
+	}
+	return nil
+}

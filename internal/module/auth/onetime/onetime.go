@@ -151,6 +151,22 @@ func (s *Service) Consume(ctx context.Context, raw, purpose string) (*Token, err
 	return t, nil
 }
 
+// Peek returns the token behind raw without spending it, with the same checks
+// as Consume, so a link can be previewed before it is used.
+func (s *Service) Peek(ctx context.Context, raw, purpose string) (*Token, error) {
+	t, err := s.repo.FindByHash(ctx, Hash(raw))
+	if err != nil {
+		return nil, err
+	}
+	if t == nil || t.Purpose != purpose || t.UsedAt != nil {
+		return nil, invalid()
+	}
+	if s.clock.Now().After(t.ExpiresAt) {
+		return nil, expired()
+	}
+	return t, nil
+}
+
 // invalid is the coded error for a token that cannot be used.
 func invalid() error {
 	return errorz.Wrap(ErrInvalid).WithCode(errorz.CodeBadRequest).WithMessage(ErrInvalid.Error())

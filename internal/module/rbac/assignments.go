@@ -132,6 +132,46 @@ func (s *Service) checkRoleGrants(ctx context.Context, a *actor, added []uuid.UU
 	return nil
 }
 
+// CheckGrantable refuses role IDs the caller may not hand out in their
+// tenant: one that is not the tenant's (400), or one granting a permission
+// the caller does not hold (PERMISSION_NOT_HELD). An invite checks this when
+// it is sent, since the roles are granted later.
+func (s *Service) CheckGrantable(ctx context.Context, roleIDs []uuid.UUID) error {
+	a, err := s.actor(ctx)
+	if err != nil {
+		return err
+	}
+	ids := slices.Clone(roleIDs)
+	slices.SortFunc(ids, func(x, y uuid.UUID) int { return slices.Compare(x[:], y[:]) })
+	ids = slices.Compact(ids)
+	roles, err := s.repo.RolesByID(ctx, a.tenantID, ids)
+	if err != nil {
+		return err
+	}
+	if len(roles) != len(ids) {
+		return errorz.BadRequest().WithMessage("role_ids: unknown role").
+			WithMeta(apierr.MetaFields, map[string]string{"role_ids": "unknown role"})
+	}
+	return s.checkRoleGrants(ctx, a, ids)
+}
+
+// GrantRoles grants the tenant's roles among roleIDs to the user and records
+// it; IDs of roles deleted since they were chosen are skipped. It joins the
+// caller's transaction.
+func (s *Service) GrantRoles(
+	ctx context.Context, tenantID, userID uuid.UUID, roleIDs []uuid.UUID, grantedBy *uuid.UUID,
+) error {
+	roles, err := s.repo.RolesByID(ctx, tenantID, roleIDs)
+	if err != nil || len(roles) == 0 {
+		return err
+	}
+	ids := make([]uuid.UUID, 0, len(roles))
+	for i := range roles {
+		ids = append(ids, roles[i].ID)
+	}
+	return s.AssignRoles(ctx, tenantID, userID, ids, grantedBy)
+}
+
 // RolesOf returns the roles each of the users holds in the tenant.
 func (s *Service) RolesOf(
 	ctx context.Context, tenantID uuid.UUID, userIDs []uuid.UUID,

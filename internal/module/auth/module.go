@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	sdkauth "github.com/biairmal/go-sdk/lib/auth"
+	"github.com/biairmal/go-sdk/lib/authz"
+	"github.com/biairmal/go-sdk/lib/httpkit/middleware"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/validator"
@@ -37,6 +39,10 @@ type Module struct {
 	profiles *Profiles
 	// resets runs forgot-password and reset-password.
 	resets *PasswordResets
+	// invites runs invite, preview and accept.
+	invites *Invites
+	// az guards the admin invite route.
+	az authz.Authorizer
 	// limiter rate-limits the public sign-in and sign-up routes; nil
 	// allows everything.
 	limiter Limiter
@@ -70,6 +76,9 @@ type Deps struct {
 	// RefreshLimiter rate-limits refresh by IP with the
 	// modules.auth.security.refresh_rate_limit budget. nil disables it.
 	RefreshLimiter Limiter
+	// Authz guards POST /v1/admin/users/invite. It may be nil when the
+	// routes are not registered.
+	Authz authz.Authorizer
 }
 
 // New loads the signing keys and builds the token builder. It fails when the
@@ -119,10 +128,16 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		outbox: deps.Outbox, tokens: tokens, tokRepo: tokRepo, log: log,
 	}
 	m.limiter = deps.Limiter
+	m.az = deps.Authz
 	tx := func(ctx context.Context, fn func(ctx context.Context) error) error {
 		return database.WithTx(ctx, deps.DB, fn)
 	}
 	issue := &tokenIssuer{cfg: &m.cfg, roles: deps.Roles, tokens: builder, clock: clk}
+	m.invites = &Invites{
+		cfg: &m.cfg, db: deps.DB, v: v, users: deps.Users, tenants: deps.Tenants, roles: deps.Roles,
+		sessions: deps.Sessions, audit: deps.Audit, outbox: deps.Outbox, tokens: tokens, tokRepo: tokRepo,
+		issue: issue, clock: clk, log: log,
+	}
 	m.logins = &Logins{
 		cfg: &m.cfg, tenancy: deps.Tenancy, v: v, tx: tx,
 		users: deps.Users, tenants: deps.Tenants, sessions: deps.Sessions,
@@ -168,6 +183,9 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.API.Post(resendVerifyPath, httpx.Handle(m.resendVerification))
 	rt.API.Post(forgotPasswordPath, httpx.Handle(m.forgotPassword))
 	rt.API.Post(resetPasswordPath, httpx.Handle(m.resetPassword))
+	rt.API.Get(invitePreviewPath, httpx.Handle(m.previewInvite))
+	rt.API.Post(inviteAcceptPath, httpx.Handle(m.acceptInvite))
+	rt.Admin.With(middleware.RequirePermission(m.az, permUsersManage)).Post(adminInvitePath, httpx.Handle(m.inviteUser))
 	rt.Me.Get(mePath, httpx.Handle(m.getMe))
 	rt.Me.Patch(mePath, httpx.Handle(m.updateMe))
 	rt.Me.Post(mePasswordPath, httpx.Handle(m.changePassword))

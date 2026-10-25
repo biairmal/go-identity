@@ -123,6 +123,31 @@ func (s *Service) EnsureActiveMember(ctx context.Context, tenantID, userID uuid.
 	})
 }
 
+// InviteMember makes a user an invited member of a tenant: it adds the
+// membership when there is none and re-invites a removed one, and leaves an
+// invited or active one alone. It returns the status before the call ("" for
+// none). Every change is audited.
+func (s *Service) InviteMember(ctx context.Context, tenantID, userID uuid.UUID) (string, error) {
+	m, err := s.repo.Member(ctx, tenantID, userID)
+	switch {
+	case errors.Is(err, errorz.ErrNotFound):
+		return "", s.AddMember(ctx, tenantID, userID, MemberInvited)
+	case err != nil:
+		return "", err
+	case m.Status != MemberRemoved:
+		return m.Status, nil
+	}
+	if err := s.repo.SetMemberStatus(ctx, tenantID, userID, MemberInvited); err != nil {
+		return "", err
+	}
+	return m.Status, s.writeAudit(ctx, &AuditEvent{
+		TenantID: tenantID, Action: ActionMemberAdd,
+		TargetType: TargetMembership, TargetID: userID.String(),
+		Before: map[string]any{"status": m.Status},
+		After:  map[string]any{"status": MemberInvited},
+	})
+}
+
 // RemoveMember marks a membership removed and records who did it. The row
 // stays, so the user's history in the tenant remains readable.
 func (s *Service) RemoveMember(ctx context.Context, tenantID, userID, actorID uuid.UUID) error {

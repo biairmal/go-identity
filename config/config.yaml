@@ -55,6 +55,8 @@ auth:                                         # enabled + auth.Config
     - { method: POST, pattern: /v1/auth/logout-all, public: true }
     - { method: POST, pattern: /v1/auth/password/forgot, public: true }
     - { method: POST, pattern: /v1/auth/password/reset, public: true }
+    - { method: GET, pattern: /v1/auth/invite/*, public: true }     # invite preview; the token is the path
+    - { method: POST, pattern: /v1/auth/invite/accept, public: true }
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}
