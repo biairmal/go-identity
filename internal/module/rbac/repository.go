@@ -8,8 +8,11 @@ import (
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/biairmal/go-identity/internal/platform/apierr"
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/httpx"
 )
 
 // Repository reads and writes the catalog, roles and assignments.
@@ -95,6 +98,136 @@ func (r *Repository) CreateRole(
 	return scanRole(row)
 }
 
+// RoleInTenant returns one of the tenant's own roles, or errorz.NotFound. A
+// template or another tenant's role is not found.
+func (r *Repository) RoleInTenant(ctx context.Context, tenantID, id uuid.UUID) (*Role, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT `+roleColumns+` FROM roles WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	return scanRole(row)
+}
+
+// UpdateRole writes a role's name and description and bumps its version,
+// provided the stored version is still version. A stale version is
+// VERSION_CONFLICT.
+func (r *Repository) UpdateRole(
+	ctx context.Context, tenantID, id uuid.UUID, version int, name, description string,
+) (*Role, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`UPDATE roles SET name = $4, description = $5, version = version + 1, updated_at = now()
+		 WHERE id = $1 AND tenant_id = $2 AND version = $3
+		 RETURNING `+roleColumns, id, tenantID, version, name, description)
+	role, err := scanRole(row)
+	if isNotFound(err) {
+		return nil, httpx.ErrVersionConflict()
+	}
+	return role, err
+}
+
+// DeleteRole deletes one of the tenant's roles. Its grants and assignments go
+// with it (ON DELETE CASCADE).
+func (r *Repository) DeleteRole(ctx context.Context, tenantID, id uuid.UUID) error {
+	_, err := database.Leader(ctx, r.db).ExecContext(ctx,
+		`DELETE FROM roles WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	if err != nil {
+		return errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: delete role")
+	}
+	return nil
+}
+
+// ListRoles returns one page of the tenant's roles ordered by name, with each
+// role's permission and assignment counts, and the total matching roles. A
+// non-empty search matches names case-insensitively.
+func (r *Repository) ListRoles(
+	ctx context.Context, tenantID uuid.UUID, search string, limit, offset int,
+) ([]RoleSummary, int64, error) {
+	conn := database.Leader(ctx, r.db)
+	const where = ` FROM roles r WHERE r.tenant_id = $1 AND ($2 = '' OR r.name ILIKE '%' || $2 || '%')`
+	var total int64
+	if err := conn.QueryRowContext(ctx, `SELECT count(*)`+where, tenantID, search).Scan(&total); err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: count roles")
+	}
+	rows, err := conn.QueryContext(ctx,
+		`SELECT r.id, r.tenant_id, r.name, r.description, r.is_system, r.version, r.created_at, r.updated_at,
+		   (SELECT count(*) FROM role_permissions rp WHERE rp.role_id = r.id),
+		   (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)`+where+`
+		 ORDER BY lower(r.name) LIMIT $3 OFFSET $4`, tenantID, search, limit, offset)
+	if err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: list roles")
+	}
+	defer func() { _ = rows.Close() }()
+	var out []RoleSummary
+	for rows.Next() {
+		var s RoleSummary
+		if err := rows.Scan(&s.ID, &s.TenantID, &s.Name, &s.Description, &s.IsSystem, &s.Version,
+			&s.CreatedAt, &s.UpdatedAt, &s.PermissionCount, &s.UserCount); err != nil {
+			return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: scan role summary")
+		}
+		out = append(out, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: role summary rows")
+	}
+	return out, total, nil
+}
+
+// RoleUserCount is the number of users a role is assigned to.
+func (r *Repository) RoleUserCount(ctx context.Context, roleID uuid.UUID) (int, error) {
+	var n int
+	err := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT count(*) FROM user_roles WHERE role_id = $1`, roleID).Scan(&n)
+	if err != nil {
+		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: role user count")
+	}
+	return n, nil
+}
+
+// HoldsRole reports whether the user is assigned the role in the tenant.
+func (r *Repository) HoldsRole(ctx context.Context, tenantID, userID, roleID uuid.UUID) (bool, error) {
+	var holds bool
+	err := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM user_roles WHERE tenant_id = $1 AND user_id = $2 AND role_id = $3)`,
+		tenantID, userID, roleID).Scan(&holds)
+	if err != nil {
+		return false, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: holds role")
+	}
+	return holds, nil
+}
+
+// activeHolder joins an assignment to an active user with an active
+// membership; only those count as holding a permission.
+const activeHolder = `
+	JOIN tenant_members tm ON tm.tenant_id = ur.tenant_id AND tm.user_id = ur.user_id AND tm.status = 'active'
+	JOIN users u ON u.id = ur.user_id AND u.status = 'active'`
+
+// ActivePermissions is EffectivePermissions for a user who is active and an
+// active member of the tenant, and empty otherwise.
+func (r *Repository) ActivePermissions(ctx context.Context, tenantID, userID uuid.UUID) ([]string, error) {
+	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
+		`SELECT DISTINCT rp.permission_key
+		 FROM user_roles ur
+		 JOIN role_permissions rp ON rp.role_id = ur.role_id`+activeHolder+`
+		 WHERE ur.tenant_id = $1 AND ur.user_id = $2
+		 ORDER BY rp.permission_key`, tenantID, userID)
+	if err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: active permissions")
+	}
+	return scanStrings(rows, "rbac: active permissions")
+}
+
+// RoleManagers counts the active users holding roles:manage in the tenant.
+func (r *Repository) RoleManagers(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	var n int
+	err := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT count(DISTINCT ur.user_id)
+		 FROM user_roles ur
+		 JOIN role_permissions rp ON rp.role_id = ur.role_id AND rp.permission_key = $2`+activeHolder+`
+		 WHERE ur.tenant_id = $1`, tenantID, PermRolesManage).Scan(&n)
+	if err != nil {
+		return 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: count role managers")
+	}
+	return n, nil
+}
+
 // RoleByName finds a role by its case-insensitive name inside one tenant, or
 // among the templates when tenantID is nil.
 func (r *Repository) RoleByName(ctx context.Context, tenantID *uuid.UUID, name string) (*Role, error) {
@@ -145,6 +278,9 @@ func (r *Repository) RolesIn(ctx context.Context, tenantID *uuid.UUID) ([]Role, 
 // SetRolePermissions replaces a role's grants with keys, in one statement
 // pair so the role is never briefly without its permissions.
 func (r *Repository) SetRolePermissions(ctx context.Context, roleID uuid.UUID, keys []string) error {
+	if keys == nil {
+		keys = []string{} // a nil slice is SQL NULL, and NOT (x = ANY(NULL)) would prune nothing
+	}
 	conn := database.Leader(ctx, r.db)
 	if _, err := conn.ExecContext(ctx,
 		`DELETE FROM role_permissions WHERE role_id = $1 AND NOT (permission_key = ANY($2))`,
@@ -264,7 +400,11 @@ func scanStrings(rows *sql.Rows, what string) ([]string, error) {
 	return out, nil
 }
 
-// scanRole reads one role row, mapping no rows to errorz.NotFound.
+// uniqueViolation is the Postgres error code of a unique index conflict.
+const uniqueViolation = "23505"
+
+// scanRole reads one role row, mapping no rows to errorz.NotFound and a name
+// already used in the tenant to DUPLICATE.
 func scanRole(row *sql.Row) (*Role, error) {
 	var r Role
 	err := row.Scan(&r.ID, &r.TenantID, &r.Name, &r.Description, &r.IsSystem,
@@ -272,6 +412,10 @@ func scanRole(row *sql.Row) (*Role, error) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errorz.NotFound().WithMessage("rbac: role not found")
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+			return nil, apierr.New(apierr.ReasonDuplicate)
 		}
 		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: scan role")
 	}

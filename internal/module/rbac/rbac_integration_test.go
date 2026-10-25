@@ -47,7 +47,10 @@ func newService(db *sqlkit.DB, cfg Config) (*Service, *recordingAudit) {
 func TestSyncCatalogAddsConfiguredAndSystemKeys(t *testing.T) {
 	db := testkit.Postgres(t)
 	ctx := context.Background()
-	svc, _ := newService(db, testConfig())
+	cfg := testConfig()
+	// A client may list a system key to describe it; it stays a system key.
+	cfg.Permissions = append(cfg.Permissions, Permission{Key: PermUsersRead, Description: "See people"})
+	svc, _ := newService(db, cfg)
 
 	if err := svc.SyncCatalog(ctx); err != nil {
 		t.Fatalf("SyncCatalog() = %v", err)
@@ -78,6 +81,9 @@ func TestSyncCatalogAddsConfiguredAndSystemKeys(t *testing.T) {
 		if !e.IsSystem {
 			t.Errorf("system key %q not marked as a system permission", p.Key)
 		}
+	}
+	if d := byKey[PermUsersRead].Description; d != "See people" {
+		t.Errorf("configured description of a system key = %q, want the configured one", d)
 	}
 }
 
@@ -424,6 +430,7 @@ func TestSetRolePermissionsReplaces(t *testing.T) {
 		{"notes:read:any"},            // swapped
 		{},                            // cleared
 		{"notes:read", "notes:write"}, // restored
+		nil,                           // cleared by a nil slice too
 	}
 	for _, want := range steps {
 		if err := repo.SetRolePermissions(ctx, role.ID, want); err != nil {

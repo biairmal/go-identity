@@ -6,6 +6,7 @@ import (
 
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/logger"
+	"github.com/biairmal/go-sdk/lib/validator"
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/platform/scope"
@@ -17,6 +18,9 @@ type Service struct {
 	repo  *Repository
 	audit AuditWriter
 	log   logger.Logger
+	az    *Authorizer
+	// v validates admin request bodies; only the admin routes use it.
+	v validator.Validator
 }
 
 // NewService returns a Service. audit may be nil, which skips the audit
@@ -25,7 +29,7 @@ func NewService(cfg Config, repo *Repository, auditWriter AuditWriter, log logge
 	if log == nil {
 		log = logger.NewNoOp()
 	}
-	return &Service{cfg: cfg, repo: repo, audit: auditWriter, log: log}
+	return &Service{cfg: cfg, repo: repo, audit: auditWriter, log: log, az: &Authorizer{repo: repo}}
 }
 
 // EffectivePermissions is the union of the permissions of every role the user

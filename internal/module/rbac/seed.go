@@ -11,9 +11,12 @@ import (
 // It inserts new keys and updates descriptions, and never deletes: a key a
 // role still grants stays, with a warning, because deleting it would silently
 // strip permissions from that role. Identity's own system permissions are
-// always present, whatever the configuration lists.
+// always present and marked as such, whatever the configuration lists; a
+// configured entry for one only changes its description.
 func (s *Service) SyncCatalog(ctx context.Context) error {
+	system := map[string]bool{}
 	for _, p := range SystemPermissions() {
+		system[p.Key] = true
 		if err := s.repo.UpsertPermission(ctx, CatalogEntry{
 			Key: p.Key, Description: p.Description, IsSystem: true,
 		}); err != nil {
@@ -21,7 +24,9 @@ func (s *Service) SyncCatalog(ctx context.Context) error {
 		}
 	}
 	for _, p := range s.cfg.Permissions {
-		if err := s.repo.UpsertPermission(ctx, CatalogEntry{Key: p.Key, Description: p.Description}); err != nil {
+		if err := s.repo.UpsertPermission(ctx, CatalogEntry{
+			Key: p.Key, Description: p.Description, IsSystem: system[p.Key],
+		}); err != nil {
 			return err
 		}
 	}
