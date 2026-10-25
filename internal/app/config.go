@@ -41,6 +41,7 @@ type Config struct {
 	Crypto    CryptoConfig     `mapstructure:"crypto"`
 	Tracing   TracingConfig    `mapstructure:"tracing"`
 	Metrics   MetricsConfig    `mapstructure:"metrics"`
+	Swagger   SwaggerConfig    `mapstructure:"swagger"`
 	Validator validator.Config `mapstructure:"validator"`
 	Lifecycle lifecycle.Config `mapstructure:"lifecycle"`
 	Modules   Modules          `mapstructure:"modules"`
@@ -110,6 +111,14 @@ type MetricsConfig struct {
 	metrics.Config `mapstructure:",squash"`
 }
 
+// SwaggerConfig toggles the generated API docs served at /swagger/index.html.
+// They sit behind HTTP basic auth, so only holders of these credentials can open them.
+type SwaggerConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
 // section is one named block of configuration that can validate itself.
 type section struct {
 	name     string
@@ -128,6 +137,7 @@ func (c *Config) sections() []section {
 		{"crypto", c.validateCrypto},
 		{"tracing", c.validateTracing},
 		{"metrics", c.validateMetrics},
+		{"swagger", c.validateSwagger},
 		{"validator", c.Validator.Validate},
 		{"lifecycle", c.Lifecycle.Validate},
 		{"modules.auth", c.Modules.Auth.Validate},
@@ -186,6 +196,13 @@ func (c *Config) validateTracing() error {
 		return nil
 	}
 	return c.Tracing.Validate()
+}
+
+func (c *Config) validateSwagger() error {
+	if c.Swagger.Enabled && (c.Swagger.Username == "" || c.Swagger.Password == "") {
+		return errorz.BadRequest().WithMessage("username and password are required when swagger is enabled")
+	}
+	return nil
 }
 
 func (c *Config) validateMetrics() error {

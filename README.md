@@ -9,7 +9,7 @@ services through `/.well-known/jwks.json`. Built on [go-sdk](https://github.com/
 ```bash
 cp .env.example .env
 make up      # Postgres in Docker
-make run     # http://localhost:8080
+make run     # http://localhost:8080  (regenerates the Swagger docs; UI at /swagger/index.html)
 curl localhost:8080/healthz
 curl localhost:8080/readyz
 ```

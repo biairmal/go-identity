@@ -27,6 +27,16 @@ type SessionResponse struct {
 }
 
 // listMine answers GET /v1/me/sessions with the caller's live sessions.
+//
+//	@Summary     List my sessions
+//	@Description Live sessions (devices) of the signed-in user.
+//	@Tags        me
+//	@Produce     json
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[[]session.SessionResponse]
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me/sessions [get]
 func (m *Module) listMine(r *http.Request) (any, error) {
 	userID, err := scope.User(r.Context())
 	if err != nil {
@@ -53,6 +63,18 @@ func (m *Module) listMine(r *http.Request) (any, error) {
 
 // revokeMine answers DELETE /v1/me/sessions/{id} with 204: that device can no
 // longer refresh. Another user's session, a dead one or a malformed ID is 404.
+//
+//	@Summary     Sign out a device
+//	@Description Revokes one session. Another user's, a dead or a malformed ID is 404.
+//	@Tags        me
+//	@Produce     json
+//	@Param       id path string true "Session (family) ID"
+//	@Security    BearerAuth
+//	@Success     204
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     404 {object} response.BaseResponse[any] "Session not found"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me/sessions/{id} [delete]
 func (m *Module) revokeMine(r *http.Request) (any, error) {
 	ctx := r.Context()
 	userID, err := scope.User(ctx)

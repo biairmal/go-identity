@@ -295,11 +295,34 @@ func nonNil(s []string) []string {
 }
 
 // getMe answers GET /v1/me.
+//
+//	@Summary     Get my profile
+//	@Description The signed-in user with tenant, roles, permissions and sign-in methods.
+//	@Tags        me
+//	@Produce     json
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[auth.MeResponse]
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me [get]
 func (m *Module) getMe(r *http.Request) (any, error) {
 	return m.profiles.Get(r.Context())
 }
 
 // updateMe answers PATCH /v1/me.
+//
+//	@Summary     Update my profile
+//	@Description Renames the signed-in user.
+//	@Tags        me
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.UpdateMeRequest true "Request body"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[auth.MeResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me [patch]
 func (m *Module) updateMe(r *http.Request) (any, error) {
 	var in UpdateMeRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -309,6 +332,19 @@ func (m *Module) updateMe(r *http.Request) (any, error) {
 }
 
 // changePassword answers POST /v1/me/password with a fresh token response.
+//
+//	@Summary     Change my password
+//	@Description Sets a new password, revokes all sessions and returns a fresh token pair.
+//	@Tags        me
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.ChangePasswordRequest true "Request body"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[auth.TokenResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me/password [post]
 func (m *Module) changePassword(r *http.Request) (any, error) {
 	var in ChangePasswordRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -318,11 +354,32 @@ func (m *Module) changePassword(r *http.Request) (any, error) {
 }
 
 // myTenants answers GET /v1/me/tenants.
+//
+//	@Summary     List my tenants
+//	@Description Tenants the signed-in user is an active member of.
+//	@Tags        me
+//	@Produce     json
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[[]auth.TenantResponse]
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me/tenants [get]
 func (m *Module) myTenants(r *http.Request) (any, error) {
 	return m.profiles.Tenants(r.Context())
 }
 
 // unlinkGoogle answers DELETE /v1/me/identities/google with 204.
+//
+//	@Summary     Unlink Google
+//	@Description Removes the Google identity unless it is the only way to sign in.
+//	@Tags        me
+//	@Produce     json
+//	@Security    BearerAuth
+//	@Success     204
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     409 {object} response.BaseResponse[any] "Last sign-in method"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/me/identities/google [delete]
 func (m *Module) unlinkGoogle(r *http.Request) (any, error) {
 	if err := m.profiles.UnlinkGoogle(r.Context()); err != nil {
 		return nil, err

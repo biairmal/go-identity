@@ -27,12 +27,32 @@ const (
 
 // getAuthConfig answers GET /v1/auth/config. Configuration is fixed for the
 // life of the process, so the response is built once in New.
+//
+//	@Summary     Sign-in settings
+//	@Description Enabled providers, registration and tenancy mode for the sign-in screen.
+//	@Tags        auth
+//	@Produce     json
+//	@Success     200 {object} response.BaseResponse[auth.AuthConfigResponse]
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/config [get]
 func (m *Module) getAuthConfig(*http.Request) (any, error) {
 	return m.authConfig, nil
 }
 
 // register answers POST /v1/auth/register with 202 and the same body whether
 // or not the address already has an account.
+//
+//	@Summary     Register
+//	@Description Creates an account. Answers 202 whether or not the address already has one.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.RegisterRequest true "Request body"
+//	@Success     202 {object} response.BaseResponse[auth.AcceptedResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/register [post]
 func (m *Module) register(r *http.Request) (any, error) {
 	if err := m.limit(r, limitRegisterIP, requestip.Get(r.Context())); err != nil {
 		return nil, err
@@ -51,6 +71,17 @@ func (m *Module) register(r *http.Request) (any, error) {
 }
 
 // verifyEmail answers POST /v1/auth/email/verify with 204.
+//
+//	@Summary     Verify email
+//	@Description Confirms an email address with the token from the verification mail.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.VerifyEmailRequest true "Request body"
+//	@Success     204
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/email/verify [post]
 func (m *Module) verifyEmail(r *http.Request) (any, error) {
 	var in VerifyEmailRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -64,12 +95,38 @@ func (m *Module) verifyEmail(r *http.Request) (any, error) {
 
 // resendVerification answers POST /v1/auth/email/resend with 202 whatever the
 // address, so it cannot be used to find accounts.
+//
+//	@Summary     Resend verification
+//	@Description Sends a new verification mail. Answers 202 whatever the address.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.EmailRequest true "Request body"
+//	@Success     202 {object} response.BaseResponse[auth.AcceptedResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/email/resend [post]
 func (m *Module) resendVerification(r *http.Request) (any, error) {
 	return m.acceptEmail(r, limitResendIP, limitResendMail, m.registrations.ResendVerification)
 }
 
 // login answers POST /v1/auth/login with a token response, or with the
 // tenants to choose from in multi mode.
+//
+//	@Summary     Log in
+//	@Description Signs in with email and password. Multi mode without a tenant may answer a tenant choice.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.LoginRequest true "Request body"
+//	@Success     200 {object} response.BaseResponse[auth.TokenResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     401 {object} response.BaseResponse[any] "Invalid credentials"
+//	@Failure     403 {object} response.BaseResponse[any] "Account locked, disabled or unverified"
+//	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/login [post]
 func (m *Module) login(r *http.Request) (any, error) {
 	var in LoginRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -79,6 +136,19 @@ func (m *Module) login(r *http.Request) (any, error) {
 }
 
 // refresh answers POST /v1/auth/refresh with a new token response.
+//
+//	@Summary     Refresh tokens
+//	@Description Exchanges a refresh token for a new token pair (rotation).
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.RefreshRequest true "Request body"
+//	@Success     200 {object} response.BaseResponse[auth.TokenResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/refresh [post]
 func (m *Module) refresh(r *http.Request) (any, error) {
 	var in RefreshRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -89,6 +159,17 @@ func (m *Module) refresh(r *http.Request) (any, error) {
 
 // logout answers POST /v1/auth/logout with 204, also for a token that no
 // longer works.
+//
+//	@Summary     Log out
+//	@Description Revokes the session of the refresh token. Answers 204 also for a token that no longer works.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.RefreshRequest true "Request body"
+//	@Success     204
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/logout [post]
 func (m *Module) logout(r *http.Request) (any, error) {
 	var in RefreshRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -102,6 +183,17 @@ func (m *Module) logout(r *http.Request) (any, error) {
 
 // logoutAll answers POST /v1/auth/logout-all with 204, also for a token that
 // no longer works.
+//
+//	@Summary     Log out everywhere
+//	@Description Revokes every session of the refresh token's user. Answers 204 also for a token that no longer works.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.RefreshRequest true "Request body"
+//	@Success     204
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/logout-all [post]
 func (m *Module) logoutAll(r *http.Request) (any, error) {
 	var in RefreshRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
@@ -138,6 +230,18 @@ func (m *Module) limitEmail(r *http.Request, prefix, email string) error {
 
 // forgotPassword answers POST /v1/auth/password/forgot with 202 whatever the
 // address, so it cannot be used to find accounts.
+//
+//	@Summary     Forgot password
+//	@Description Sends a reset mail. Answers 202 whatever the address.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.EmailRequest true "Request body"
+//	@Success     202 {object} response.BaseResponse[auth.AcceptedResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/password/forgot [post]
 func (m *Module) forgotPassword(r *http.Request) (any, error) {
 	return m.acceptEmail(r, limitForgotIP, limitForgotEmail, m.resets.Forgot)
 }
@@ -164,6 +268,18 @@ func (m *Module) acceptEmail(
 }
 
 // resetPassword answers POST /v1/auth/password/reset with 204.
+//
+//	@Summary     Reset password
+//	@Description Sets a new password with the token from the reset mail.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.ResetPasswordRequest true "Request body"
+//	@Success     204
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/password/reset [post]
 func (m *Module) resetPassword(r *http.Request) (any, error) {
 	if err := m.limit(r, limitResetIP, requestip.Get(r.Context())); err != nil {
 		return nil, err
