@@ -8,6 +8,7 @@ import (
 	sdkauth "github.com/biairmal/go-sdk/lib/auth"
 	"github.com/biairmal/go-sdk/lib/authz"
 	"github.com/biairmal/go-sdk/lib/errorz"
+	"github.com/biairmal/go-sdk/lib/sqlkit"
 
 	"github.com/biairmal/go-identity/internal/platform/scope"
 )
@@ -104,3 +105,7 @@ func Memoize(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), memoKey{}, &memo{})))
 	})
 }
+
+// NewAuthorizer returns an Authorizer over db, for modules built before rbac.
+// It reads the same tables as the rbac module's own, so the two agree.
+func NewAuthorizer(db *sqlkit.DB) *Authorizer { return &Authorizer{repo: NewRepository(db)} }

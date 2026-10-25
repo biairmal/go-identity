@@ -8,6 +8,93 @@
     },
     "basePath": "/",
     "paths": {
+        "/v1/admin/audit": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The tenant's audit log, newest first. action takes a LIKE pattern such as role.%",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Read the audit log",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page, 1-based",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size, max 100",
+                        "name": "size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Actor user ID",
+                        "name": "actor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Action, or a LIKE pattern",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Earliest time, RFC 3339",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Latest time, RFC 3339",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_audit_EntryPageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Missing audit:read",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/admin/permissions": {
             "get": {
                 "security": [
@@ -1749,6 +1836,81 @@
         }
     },
     "definitions": {
+        "internal_module_audit.ActorResponse": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_module_audit.EntryPageResponse": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "type": "boolean"
+                },
+                "has_prev": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_module_audit.EntryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_module_audit.EntryResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "actor": {
+                    "$ref": "#/definitions/internal_module_audit.ActorResponse"
+                },
+                "after": {
+                    "type": "object"
+                },
+                "at": {
+                    "type": "string"
+                },
+                "before": {
+                    "type": "object"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "target_id": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_module_auth.AcceptedResponse": {
             "type": "object",
             "properties": {
@@ -2423,6 +2585,24 @@
                     "items": {
                         "$ref": "#/definitions/internal_module_session.SessionResponse"
                     }
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-internal_module_audit_EntryPageResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/internal_module_audit.EntryPageResponse"
                 },
                 "error": {},
                 "message": {
