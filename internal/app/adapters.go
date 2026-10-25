@@ -124,6 +124,7 @@ func (m tenantMemberships) Memberships(ctx context.Context, userID uuid.UUID) ([
 				ID: ms.TenantID, Slug: ms.Slug, Name: ms.Name, Active: ms.TenantStatus == tenant.StatusActive,
 			},
 			Active: ms.MemberStatus == tenant.MemberActive,
+			Status: ms.MemberStatus,
 		})
 	}
 	return out, nil
@@ -412,4 +413,22 @@ func (a userRoles) GuardRoleManagers(
 	ctx context.Context, userID uuid.UUID, change func(context.Context) error,
 ) error {
 	return a.svc.GuardRoleManagers(ctx, userID, change)
+}
+
+// InviteMember makes the user an invited member of the tenant and returns
+// the previous status.
+func (m tenantMemberships) InviteMember(ctx context.Context, tenantID, userID uuid.UUID) (string, error) {
+	return m.svc.InviteMember(ctx, tenantID, userID)
+}
+
+// CheckGrantable refuses roles the caller may not hand out.
+func (a authRoles) CheckGrantable(ctx context.Context, roleIDs []uuid.UUID) error {
+	return a.svc.CheckGrantable(ctx, roleIDs)
+}
+
+// GrantRoles grants the tenant's roles among roleIDs.
+func (a authRoles) GrantRoles(
+	ctx context.Context, tenantID, userID uuid.UUID, roleIDs []uuid.UUID, grantedBy *uuid.UUID,
+) error {
+	return a.svc.GrantRoles(ctx, tenantID, userID, roleIDs, grantedBy)
 }

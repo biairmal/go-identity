@@ -146,6 +146,10 @@ func (f *fakeTenants) Memberships(_ context.Context, userID uuid.UUID) ([]Member
 	return append([]Membership(nil), f.memberships[userID]...), nil
 }
 
+func (f *fakeTenants) InviteMember(context.Context, uuid.UUID, uuid.UUID) (string, error) {
+	return "", nil
+}
+
 // fakeRoles grants every user the member role.
 type fakeRoles struct{}
 
@@ -157,6 +161,12 @@ func (fakeRoles) RoleNames(context.Context, uuid.UUID, uuid.UUID) ([]string, err
 
 func (fakeRoles) Permissions(context.Context, uuid.UUID, uuid.UUID) ([]string, error) {
 	return []string{"notes:read"}, nil
+}
+
+func (fakeRoles) CheckGrantable(context.Context, []uuid.UUID) error { return nil }
+
+func (fakeRoles) GrantRoles(context.Context, uuid.UUID, uuid.UUID, []uuid.UUID, *uuid.UUID) error {
+	return nil
 }
 
 // fakeSessions records issued families. rotated and rotateErr script
@@ -473,6 +483,7 @@ func TestLoginTenantResolution(t *testing.T) {
 	acme := TenantInfo{ID: uuid.New(), Slug: "acme", Name: "Acme", Active: true}
 	beta := TenantInfo{ID: uuid.New(), Slug: "beta", Name: "Beta", Active: true}
 	gone := TenantInfo{ID: uuid.New(), Slug: "gone", Name: "Gone", Active: false}
+	in := func(t TenantInfo, active bool) Membership { return Membership{Tenant: t, Active: active} }
 	tests := []struct {
 		name        string
 		memberships []Membership
@@ -481,13 +492,13 @@ func TestLoginTenantResolution(t *testing.T) {
 		wantChoice  []string      // slugs offered
 		wantReason  apierr.Reason // error
 	}{
-		{"one tenant", []Membership{{acme, true}}, "", "acme", nil, ""},
-		{"several, none named", []Membership{{acme, true}, {beta, true}}, "", "", []string{"acme", "beta"}, ""},
-		{"several, one named", []Membership{{acme, true}, {beta, true}}, "beta", "beta", nil, ""},
-		{"inactive membership ignored", []Membership{{acme, true}, {beta, false}}, "", "acme", nil, ""},
-		{"named but not a member", []Membership{{acme, true}}, "beta", "", nil, apierr.ReasonInvalidCredentials},
+		{"one tenant", []Membership{in(acme, true)}, "", "acme", nil, ""},
+		{"several, none named", []Membership{in(acme, true), in(beta, true)}, "", "", []string{"acme", "beta"}, ""},
+		{"several, one named", []Membership{in(acme, true), in(beta, true)}, "beta", "beta", nil, ""},
+		{"inactive membership ignored", []Membership{in(acme, true), in(beta, false)}, "", "acme", nil, ""},
+		{"named but not a member", []Membership{in(acme, true)}, "beta", "", nil, apierr.ReasonInvalidCredentials},
 		{"no tenant", nil, "", "", nil, apierr.ReasonInvalidCredentials},
-		{"suspended tenant", []Membership{{gone, true}}, "", "", nil, apierr.ReasonTenantSuspended},
+		{"suspended tenant", []Membership{in(gone, true)}, "", "", nil, apierr.ReasonTenantSuspended},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

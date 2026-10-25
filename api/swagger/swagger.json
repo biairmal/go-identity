@@ -670,6 +670,75 @@
                 }
             }
         },
+        "/v1/admin/users/invite": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Invites an email into the tenant with roles; re-inviting re-sends.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Invite a user",
+                "parameters": [
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_module_auth.InviteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_InviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body or unknown role",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "No users:manage, PERMISSION_NOT_HELD, SUPER_ADMIN_PROTECTED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "409": {
+                        "description": "Already an active member",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/admin/users/{id}": {
             "get": {
                 "security": [
@@ -1148,6 +1217,117 @@
                     },
                     "400": {
                         "description": "Invalid body or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/invite/accept": {
+            "post": {
+                "description": "Joins the tenant and signs in. password is required only when the account has none.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Accept an invite",
+                "parameters": [
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_module_auth.AcceptInviteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "TOKEN_INVALID or PASSWORD_POLICY",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "ACCOUNT_DISABLED or TENANT_SUSPENDED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limited",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/invite/{token}": {
+            "get": {
+                "description": "What an invite is for: tenant name, masked email, and whether a password is needed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Preview an invite",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invite token from the link",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_InvitePreviewResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "TOKEN_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "ACCOUNT_DISABLED or TENANT_SUSPENDED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limited",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -1911,6 +2091,26 @@
                 }
             }
         },
+        "internal_module_auth.AcceptInviteRequest": {
+            "type": "object",
+            "required": [
+                "token"
+            ],
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "password": {
+                    "description": "Password is required only when the account has none; otherwise it is\nignored, so an invite never changes an existing password.",
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string",
+                    "maxLength": 256
+                }
+            }
+        },
         "internal_module_auth.AcceptedResponse": {
             "type": "object",
             "properties": {
@@ -1952,6 +2152,60 @@
             "type": "object",
             "properties": {
                 "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_module_auth.InvitePreviewResponse": {
+            "type": "object",
+            "properties": {
+                "email_masked": {
+                    "type": "string"
+                },
+                "has_password": {
+                    "type": "boolean"
+                },
+                "tenant": {
+                    "$ref": "#/definitions/internal_module_auth.InviteTenantResponse"
+                }
+            }
+        },
+        "internal_module_auth.InviteRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "role_ids"
+            ],
+            "properties": {
+                "display_name": {
+                    "description": "DisplayName names a new account; an existing one keeps its own.",
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "internal_module_auth.InviteResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_module_auth.InviteTenantResponse": {
+            "type": "object",
+            "properties": {
+                "name": {
                     "type": "string"
                 }
             }
@@ -2639,6 +2893,42 @@
                 },
                 "data": {
                     "$ref": "#/definitions/internal_module_auth.AuthConfigResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-internal_module_auth_InvitePreviewResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/internal_module_auth.InvitePreviewResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-internal_module_auth_InviteResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/internal_module_auth.InviteResponse"
                 },
                 "error": {},
                 "message": {

@@ -503,6 +503,8 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/TokenResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /v1/auth/token:
     post:
@@ -762,6 +764,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /v1/admin/users/{id}:
     get:
