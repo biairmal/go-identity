@@ -19,6 +19,12 @@ type Role struct {
 	UpdatedAt   time.Time
 }
 
+// RoleRef names one role a user holds.
+type RoleRef struct {
+	ID   uuid.UUID
+	Name string
+}
+
 // RoleSummary is a role with the number of permissions it grants and users
 // it is assigned to, for the admin role list.
 type RoleSummary struct {

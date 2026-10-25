@@ -1,14 +1,15 @@
 package user
 
-import "time"
+import (
+	"time"
+
+	"github.com/biairmal/go-sdk/lib/common/dto"
+)
 
 // UserResponse is the user shape the API returns. It is a separate type from the
 // row struct on purpose: the row gains columns that must not leak (the lock
 // counters, the super admin flag's neighbors), and a DTO makes every added
 // field an explicit decision.
-//
-// The admin list adds the caller's tenant membership and roles, which come
-// from other modules and arrive with the admin user endpoints.
 type UserResponse struct { //nolint:revive // named for its resource: the package will hold other response DTOs
 	ID                 string     `json:"id"`
 	Email              string     `json:"email"`
@@ -19,6 +20,53 @@ type UserResponse struct { //nolint:revive // named for its resource: the packag
 	LastSignInAt       *time.Time `json:"last_sign_in_at"`
 	CreatedAt          time.Time  `json:"created_at"`
 	Version            int        `json:"version"`
+}
+
+// AdminUserResponse is one member in GET /v1/admin/users.
+type AdminUserResponse struct {
+	ID               string            `json:"id"`
+	Email            string            `json:"email"`
+	DisplayName      string            `json:"display_name"`
+	Status           string            `json:"status"`
+	MembershipStatus string            `json:"membership_status"`
+	Roles            []RoleRefResponse `json:"roles"`
+	CreatedAt        time.Time         `json:"created_at"`
+	LastSignInAt     *time.Time        `json:"last_sign_in_at"`
+}
+
+// AdminUserDetailResponse is GET /v1/admin/users/{id}: the list shape plus
+// sign-in methods and version.
+type AdminUserDetailResponse struct {
+	AdminUserResponse
+	Providers ProvidersResponse `json:"providers"`
+	Version   int               `json:"version"`
+}
+
+// AdminUserPageResponse is the data of GET /v1/admin/users.
+type AdminUserPageResponse = dto.PageResponse[AdminUserResponse]
+
+// ProvidersResponse says which sign-in methods an account has.
+type ProvidersResponse struct {
+	Password bool `json:"password"`
+	Google   bool `json:"google"`
+}
+
+// RoleRefResponse names one role a member holds.
+type RoleRefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// newAdminUserResponse maps a member and their roles to the list shape.
+func newAdminUserResponse(m *Member, roles []RoleRef) *AdminUserResponse {
+	refs := make([]RoleRefResponse, 0, len(roles))
+	for _, r := range roles {
+		refs = append(refs, RoleRefResponse{ID: r.ID.String(), Name: r.Name})
+	}
+	return &AdminUserResponse{
+		ID: m.ID.String(), Email: m.Email, DisplayName: m.DisplayName, Status: m.Status,
+		MembershipStatus: m.MembershipStatus, Roles: refs, CreatedAt: m.CreatedAt.UTC(), LastSignInAt: utc(m.LastSignInAt),
+	}
 }
 
 // NewUserResponse maps a user row to its API shape.
@@ -34,4 +82,13 @@ func NewUserResponse(u *User) UserResponse {
 		CreatedAt:          u.CreatedAt,
 		Version:            u.Version,
 	}
+}
+
+// utc returns t in UTC, or nil.
+func utc(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC()
+	return &u
 }

@@ -193,6 +193,130 @@ func (r *Repository) HoldsRole(ctx context.Context, tenantID, userID, roleID uui
 	return holds, nil
 }
 
+// RolesByID returns the tenant's roles among ids. An ID of another tenant or
+// of a template is left out, so a short result means an unknown ID.
+func (r *Repository) RolesByID(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) ([]Role, error) {
+	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
+		`SELECT `+roleColumns+` FROM roles WHERE tenant_id = $1 AND id = ANY($2) ORDER BY lower(name)`,
+		tenantID, ids)
+	if err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: roles by id")
+	}
+	defer func() { _ = rows.Close() }()
+	var out []Role
+	for rows.Next() {
+		role, err := scanRoleRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: role rows")
+	}
+	return out, nil
+}
+
+// PermissionsOfRoles is the union of the keys the roles grant.
+func (r *Repository) PermissionsOfRoles(ctx context.Context, ids []uuid.UUID) ([]string, error) {
+	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
+		`SELECT DISTINCT permission_key FROM role_permissions WHERE role_id = ANY($1) ORDER BY permission_key`, ids)
+	if err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: permissions of roles")
+	}
+	return scanStrings(rows, "rbac: permissions of roles")
+}
+
+// UserRoles returns the roles each of the users holds in the tenant, ordered
+// by name. A user with no role has no entry.
+func (r *Repository) UserRoles(
+	ctx context.Context, tenantID uuid.UUID, userIDs []uuid.UUID,
+) (map[uuid.UUID][]RoleRef, error) {
+	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
+		`SELECT ur.user_id, ro.id, ro.name
+		 FROM user_roles ur JOIN roles ro ON ro.id = ur.role_id
+		 WHERE ur.tenant_id = $1 AND ur.user_id = ANY($2)
+		 ORDER BY lower(ro.name)`, tenantID, userIDs)
+	if err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: user roles")
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[uuid.UUID][]RoleRef{}
+	for rows.Next() {
+		var userID uuid.UUID
+		var ref RoleRef
+		if err := rows.Scan(&userID, &ref.ID, &ref.Name); err != nil {
+			return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: scan user role")
+		}
+		out[userID] = append(out[userID], ref)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: user role rows")
+	}
+	return out, nil
+}
+
+// UnassignRoles removes the user's roles in the tenant, except those in keep.
+func (r *Repository) UnassignRoles(ctx context.Context, tenantID, userID uuid.UUID, keep []uuid.UUID) error {
+	if keep == nil {
+		keep = []uuid.UUID{} // nil is SQL NULL, and NOT (x = ANY(NULL)) would remove nothing
+	}
+	_, err := database.Leader(ctx, r.db).ExecContext(ctx,
+		`DELETE FROM user_roles WHERE tenant_id = $1 AND user_id = $2 AND NOT (role_id = ANY($3))`,
+		tenantID, userID, keep)
+	if err != nil {
+		return errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: unassign roles")
+	}
+	return nil
+}
+
+// Member returns the status of the user's membership in the tenant and
+// whether the user is the super admin, or errorz.NotFound without a
+// membership. It reads the tenant and user tables directly: a port would make
+// rbac and user depend on each other.
+func (r *Repository) Member(
+	ctx context.Context, tenantID, userID uuid.UUID,
+) (status string, superAdmin bool, err error) {
+	err = database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT tm.status, u.is_super_admin
+		 FROM tenant_members tm JOIN users u ON u.id = tm.user_id
+		 WHERE tm.tenant_id = $1 AND tm.user_id = $2`, tenantID, userID).Scan(&status, &superAdmin)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, errorz.NotFound().WithMessage("rbac: user not found")
+	}
+	if err != nil {
+		return "", false, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: member")
+	}
+	return status, superAdmin, nil
+}
+
+// ManagedTenants lists, in a fixed order, the tenants where the user is an
+// active holder of roles:manage.
+func (r *Repository) ManagedTenants(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
+		`SELECT DISTINCT ur.tenant_id
+		 FROM user_roles ur
+		 JOIN role_permissions rp ON rp.role_id = ur.role_id AND rp.permission_key = $2`+activeHolder+`
+		 WHERE ur.user_id = $1
+		 ORDER BY ur.tenant_id`, userID, PermRolesManage)
+	if err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: managed tenants")
+	}
+	defer func() { _ = rows.Close() }()
+	var out []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: scan tenant")
+		}
+		out = append(out, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: tenant rows")
+	}
+	return out, nil
+}
+
 // activeHolder joins an assignment to an active user with an active
 // membership; only those count as holding a permission.
 const activeHolder = `
