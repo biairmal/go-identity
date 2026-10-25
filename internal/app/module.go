@@ -73,14 +73,16 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 		Audit: rbacAudit{w: auditModule.Writer()},
 	})
 
-	sessionModule := session.New(cfg.Modules.Session, session.Deps{
-		DB:    deps.DB,
-		Log:   deps.Log,
-		Clock: clock.System{},
-		Audit: sessionAudit{w: auditModule.Writer()},
+	sessionModule := session.New(cfg.Modules.Session, &session.Deps{
+		DB:      deps.DB,
+		Log:     deps.Log,
+		Clock:   clock.System{},
+		Audit:   sessionAudit{w: auditModule.Writer()},
+		Members: sessionMembers{svc: tenantModule.Service()},
+		Authz:   rbacModule.Authorizer(),
 	})
 
-	userModule, err := newUserModule(cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service())
+	userModule, err := newUserModule(cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service(), rbacModule)
 	if err != nil {
 		return nil, nil, err
 	}

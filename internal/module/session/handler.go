@@ -94,3 +94,28 @@ func (m *Module) revokeMine(r *http.Request) (any, error) {
 	}
 	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
 }
+
+// revokeForUser answers POST /v1/admin/users/{id}/revoke-sessions with 204.
+//
+//	@Summary     Revoke a user's sessions
+//	@Description Signs a member out of every device in this tenant.
+//	@Tags        admin
+//	@Produce     json
+//	@Param       id path string true "User ID"
+//	@Security    BearerAuth
+//	@Success     204
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     403 {object} response.BaseResponse[any] "Missing users:manage"
+//	@Failure     404 {object} response.BaseResponse[any] "Not a member of the tenant"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/admin/users/{id}/revoke-sessions [post]
+func (m *Module) revokeForUser(r *http.Request) (any, error) {
+	userID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		return nil, errorz.NotFound().WithMessage("session: user not found")
+	}
+	if err := m.svc.RevokeForMember(r.Context(), userID); err != nil {
+		return nil, err
+	}
+	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
+}

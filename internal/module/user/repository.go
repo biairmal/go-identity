@@ -203,6 +203,112 @@ func (r *Repository) SetSuperAdmin(ctx context.Context, id uuid.UUID, on bool) e
 		 WHERE id = $1`, id, on)
 }
 
+// Member is a user seen from one tenant: the account plus its membership.
+type Member struct {
+	User
+	MembershipStatus string
+}
+
+// MemberFilter narrows the admin user list. Zero values do not filter.
+type MemberFilter struct {
+	// Search matches the display name case-insensitively, or the email
+	// exactly (by blind index).
+	Search string
+	Status string
+	RoleID *uuid.UUID
+	// OrderBy is a list of allow-listed column expressions with direction.
+	OrderBy []string
+	Limit   int
+	Offset  int
+}
+
+// memberColumns is userColumns qualified by the users alias, then the
+// membership status.
+const memberColumns = `u.id, u.email_enc, u.display_name, u.status, u.email_verified_at, u.is_super_admin,
+	u.must_change_password, u.failed_logins, u.locked_until, u.last_sign_in_at, u.version, u.created_at,
+	u.updated_at, tm.status`
+
+// memberSortColumns maps the sort fields the API accepts to SQL.
+var memberSortColumns = map[string]string{
+	"display_name": "lower(u.display_name)",
+	"created_at":   "u.created_at",
+}
+
+// memberFrom selects the tenant's current members (not removed). It joins
+// tenant_members and user_roles, owned by tenant and rbac, because a paged,
+// filtered list cannot be assembled through ports.
+const memberFrom = `
+	FROM users u
+	JOIN tenant_members tm ON tm.user_id = u.id AND tm.tenant_id = $1 AND tm.status <> 'removed'
+	WHERE ($2 = '' OR u.display_name ILIKE '%' || $2 || '%' OR u.email_hash = $3)
+	  AND ($4 = '' OR u.status = $4)
+	  AND ($5::uuid IS NULL OR EXISTS (
+	      SELECT 1 FROM user_roles ur WHERE ur.tenant_id = tm.tenant_id AND ur.user_id = u.id AND ur.role_id = $5))`
+
+// ListMembers returns one page of the tenant's members and the total
+// matching.
+func (r *Repository) ListMembers(ctx context.Context, tenantID uuid.UUID, f *MemberFilter) ([]Member, int64, error) {
+	conn := database.Leader(ctx, r.db)
+	var hash []byte
+	if f.Search != "" {
+		hash = r.cipher.BlindIndex(NormalizeEmail(f.Search))
+	}
+	args := []any{tenantID, f.Search, hash, f.Status, f.RoleID}
+	var total int64
+	if err := conn.QueryRowContext(ctx, `SELECT count(*)`+memberFrom, args...).Scan(&total); err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: count members")
+	}
+	order := ""
+	for _, o := range f.OrderBy {
+		order += o + ", "
+	}
+	rows, err := conn.QueryContext(ctx,
+		`SELECT `+memberColumns+memberFrom+`
+		 ORDER BY `+order+`u.id LIMIT $6 OFFSET $7`, append(args, f.Limit, f.Offset)...)
+	if err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: list members")
+	}
+	defer func() { _ = rows.Close() }()
+	var out []Member
+	for rows.Next() {
+		var m Member
+		if err := r.scanInto(rows, &m.User, &m.MembershipStatus); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: member rows")
+	}
+	return out, total, nil
+}
+
+// MemberInTenant returns one current member of the tenant, or
+// errorz.NotFound for a user who is not one (or was removed).
+func (r *Repository) MemberInTenant(ctx context.Context, tenantID, id uuid.UUID) (*Member, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT `+memberColumns+`
+		 FROM users u
+		 JOIN tenant_members tm ON tm.user_id = u.id AND tm.tenant_id = $1 AND tm.status <> 'removed'
+		 WHERE u.id = $2`, tenantID, id)
+	var m Member
+	if err := r.scanInto(row, &m.User, &m.MembershipStatus); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// HasGoogle reports whether a Google identity is linked to the user.
+func (r *Repository) HasGoogle(ctx context.Context, id uuid.UUID) (bool, error) {
+	var has bool
+	err := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM identities WHERE user_id = $1 AND provider = 'google')`, id).Scan(&has)
+	if err != nil {
+		return false, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: has google")
+	}
+	return has, nil
+}
+
 // encrypt returns the ciphertext and the blind index of an already-normalized
 // email.
 func (r *Repository) encrypt(normalized string) (enc, hash []byte, err error) {
@@ -216,23 +322,32 @@ func (r *Repository) encrypt(normalized string) (enc, hash []byte, err error) {
 // scan reads one user row and decrypts its email, mapping no rows to
 // errorz.NotFound.
 func (r *Repository) scan(row *sql.Row) (*User, error) {
-	var (
-		u   User
-		enc []byte
-	)
-	err := row.Scan(&u.ID, &enc, &u.DisplayName, &u.Status, &u.EmailVerifiedAt, &u.IsSuperAdmin,
-		&u.MustChangePassword, &u.FailedLogins, &u.LockedUntil, &u.LastSignInAt, &u.Version,
-		&u.CreatedAt, &u.UpdatedAt)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		return nil, errorz.NotFound().WithMessage("user: not found")
-	case err != nil:
-		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: scan")
-	}
-	if u.Email, err = r.cipher.Decrypt(enc); err != nil {
-		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: decrypt email")
+	var u User
+	if err := r.scanInto(row, &u); err != nil {
+		return nil, err
 	}
 	return &u, nil
+}
+
+// scanInto reads userColumns, then extra, into u and decrypts the email.
+func (r *Repository) scanInto(row interface{ Scan(...any) error }, u *User, extra ...any) error {
+	var enc []byte
+	dest := append([]any{
+		&u.ID, &enc, &u.DisplayName, &u.Status, &u.EmailVerifiedAt, &u.IsSuperAdmin,
+		&u.MustChangePassword, &u.FailedLogins, &u.LockedUntil, &u.LastSignInAt, &u.Version,
+		&u.CreatedAt, &u.UpdatedAt,
+	}, extra...)
+	err := row.Scan(dest...)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return errorz.NotFound().WithMessage("user: not found")
+	case err != nil:
+		return errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: scan")
+	}
+	if u.Email, err = r.cipher.Decrypt(enc); err != nil {
+		return errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: decrypt email")
+	}
+	return nil
 }
 
 // exec runs an update that matches on the ID alone, turning no affected rows

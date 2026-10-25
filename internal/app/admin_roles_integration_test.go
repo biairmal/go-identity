@@ -67,7 +67,7 @@ func (f *loginFixture) userID(t *testing.T, name string) string {
 // as email; display names in these tests are unique.
 func (f *loginFixture) grant(t *testing.T, email, role string) {
 	t.Helper()
-	name := map[string]string{"bia@example.com": "Bia", "kim@example.com": "Kim"}[email]
+	name := map[string]string{"bia@example.com": "Bia", "kim@example.com": "Kim", "lee@example.com": "Lee"}[email]
 	f.exec(t, `INSERT INTO user_roles (tenant_id, user_id, role_id)
 		SELECT r.tenant_id, u.id, r.id FROM roles r, users u
 		WHERE r.tenant_id IS NOT NULL AND r.name = $1 AND u.display_name = $2`, role, name)

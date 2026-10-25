@@ -221,3 +221,33 @@ func (m *Module) deleteRole(r *http.Request) (any, error) {
 	}
 	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
 }
+
+// setUserRoles answers PUT /v1/admin/users/{id}/roles.
+//
+//	@Summary     Replace a user's roles
+//	@Description Sets the full list of roles a user holds in the tenant.
+//	@Tags        admin
+//	@Accept      json
+//	@Produce     json
+//	@Param       id   path string                   true "User ID"
+//	@Param       body body rbac.SetUserRolesRequest true "Request body"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[rbac.UserRolesResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or unknown role"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     403 {object} response.BaseResponse[any] "PERMISSION_NOT_HELD, SELF_ESCALATION or SUPER_ADMIN_PROTECTED"
+//	@Failure     404 {object} response.BaseResponse[any] "User not found in the tenant"
+//	@Failure     409 {object} response.BaseResponse[any] "LAST_ADMIN"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/admin/users/{id}/roles [put]
+func (m *Module) setUserRoles(r *http.Request) (any, error) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		return nil, errorz.NotFound().WithMessage("rbac: user not found")
+	}
+	var in SetUserRolesRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	return m.svc.SetUserRoles(r.Context(), id, &in)
+}

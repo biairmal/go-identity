@@ -26,6 +26,28 @@ type Memberships interface {
 	// AddActiveMember makes userID an active member of tenantID. An
 	// existing membership is left unchanged.
 	AddActiveMember(ctx context.Context, tenantID, userID uuid.UUID) error
+	// RemoveMember marks userID's membership of tenantID removed, recording
+	// actorID as the one who did it.
+	RemoveMember(ctx context.Context, tenantID, userID, actorID uuid.UUID) error
+}
+
+// Roles is what the admin user endpoints need from rbac, which owns role
+// assignments.
+type Roles interface {
+	// RolesOf returns the roles each of the users holds in the tenant.
+	RolesOf(ctx context.Context, tenantID uuid.UUID, userIDs []uuid.UUID) (map[uuid.UUID][]RoleRef, error)
+	// RemoveAll removes every role the user holds in the tenant.
+	RemoveAll(ctx context.Context, tenantID, userID uuid.UUID) error
+	// GuardRoleManagers runs change in the caller's transaction and refuses
+	// it with LAST_ADMIN when it leaves a tenant without an active
+	// roles:manage holder.
+	GuardRoleManagers(ctx context.Context, userID uuid.UUID, change func(context.Context) error) error
+}
+
+// RoleRef names one role a user holds.
+type RoleRef struct {
+	ID   uuid.UUID
+	Name string
 }
 
 // Sessions revokes a user's refresh-token families.
@@ -57,6 +79,8 @@ const (
 	ActionSuperAdminCreate   = "superadmin.create"
 	ActionSuperAdminReset    = "superadmin.reset"
 	ActionSuperAdminTransfer = "superadmin.transfer"
+	ActionUserDisable        = "user.disable"
+	ActionUserEnable         = "user.enable"
 )
 
 // TargetUser is the target type this module records.
