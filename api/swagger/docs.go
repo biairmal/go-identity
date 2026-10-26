@@ -632,6 +632,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "invited, active or disabled, in this tenant",
+                        "name": "membership_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Role ID",
                         "name": "role",
                         "in": "query"
@@ -732,7 +738,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Already an active member",
+                        "description": "ALREADY_MEMBER: an active or disabled member",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -870,7 +876,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Blocks sign-in and revokes every session. Disabling yourself is refused.",
+                "description": "Disables the membership in this tenant, not the account; revokes their sessions here. Not yourself.",
                 "produces": [
                     "application/json"
                 ],
@@ -898,7 +904,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing users:manage, yourself, or SUPER_ADMIN_PROTECTED",
+                        "description": "Missing users:manage, SELF_ACTION, or SUPER_ADMIN_PROTECTED",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -931,7 +937,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lets a disabled user sign in again.",
+                "description": "Lets a disabled member act in the caller's tenant again.",
                 "produces": [
                     "application/json"
                 ],

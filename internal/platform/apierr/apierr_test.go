@@ -36,6 +36,8 @@ func TestReasonStatuses(t *testing.T) {
 		ReasonSystemRole:             http.StatusForbidden,
 		ReasonRoleInUse:              http.StatusConflict,
 		ReasonSuperAdminProtected:    http.StatusForbidden,
+		ReasonSelfAction:             http.StatusForbidden,
+		ReasonAlreadyMember:          http.StatusConflict,
 		ReasonVersionConflict:        http.StatusConflict,
 		ReasonDuplicate:              http.StatusConflict,
 		ReasonRateLimited:            http.StatusTooManyRequests,

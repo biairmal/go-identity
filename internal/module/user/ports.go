@@ -29,6 +29,10 @@ type Memberships interface {
 	// RemoveMember marks userID's membership of tenantID removed, recording
 	// actorID as the one who did it.
 	RemoveMember(ctx context.Context, tenantID, userID, actorID uuid.UUID) error
+	// DisableMember blocks userID in tenantID only.
+	DisableMember(ctx context.Context, tenantID, userID uuid.UUID) error
+	// EnableMember lets a disabled membership of userID in tenantID act again.
+	EnableMember(ctx context.Context, tenantID, userID uuid.UUID) error
 }
 
 // Roles is what the admin user endpoints need from rbac, which owns role
@@ -39,9 +43,9 @@ type Roles interface {
 	// RemoveAll removes every role the user holds in the tenant.
 	RemoveAll(ctx context.Context, tenantID, userID uuid.UUID) error
 	// GuardRoleManagers runs change in the caller's transaction and refuses
-	// it with LAST_ADMIN when it leaves a tenant without an active
+	// it with LAST_ADMIN when it leaves the tenant without an active
 	// roles:manage holder.
-	GuardRoleManagers(ctx context.Context, userID uuid.UUID, change func(context.Context) error) error
+	GuardRoleManagers(ctx context.Context, tenantID uuid.UUID, change func(context.Context) error) error
 }
 
 // RoleRef names one role a user holds.
@@ -54,6 +58,9 @@ type RoleRef struct {
 type Sessions interface {
 	// RevokeAllForUser revokes every live session of userID.
 	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
+	// RevokeAllForUserInTenant revokes every live session of userID in
+	// tenantID.
+	RevokeAllForUserInTenant(ctx context.Context, userID, tenantID uuid.UUID) error
 }
 
 // AuditWriter records user changes. internal/app wires it over the audit

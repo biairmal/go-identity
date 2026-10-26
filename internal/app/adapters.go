@@ -410,9 +410,19 @@ func (a userRoles) RemoveAll(ctx context.Context, tenantID, userID uuid.UUID) er
 
 // GuardRoleManagers runs change under rbac's last-admin protection.
 func (a userRoles) GuardRoleManagers(
-	ctx context.Context, userID uuid.UUID, change func(context.Context) error,
+	ctx context.Context, tenantID uuid.UUID, change func(context.Context) error,
 ) error {
-	return a.svc.GuardRoleManagers(ctx, userID, change)
+	return a.svc.GuardRoleManagers(ctx, tenantID, change)
+}
+
+// DisableMember blocks the user in the tenant only.
+func (m tenantMemberships) DisableMember(ctx context.Context, tenantID, userID uuid.UUID) error {
+	return m.svc.DisableMember(ctx, tenantID, userID)
+}
+
+// EnableMember lets a disabled membership act again.
+func (m tenantMemberships) EnableMember(ctx context.Context, tenantID, userID uuid.UUID) error {
+	return m.svc.EnableMember(ctx, tenantID, userID)
 }
 
 // InviteMember makes the user an invited member of the tenant and returns

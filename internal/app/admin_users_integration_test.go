@@ -149,9 +149,8 @@ func TestAdminUserDisableEnable(t *testing.T) {
 	}
 
 	self := "/v1/admin/users/" + f.userID(t, "Bia") + "/disable"
-	if r := f.do(t, http.MethodPost, self, f.bia, nil, ""); r.Status != http.StatusForbidden {
-		t.Errorf("disable yourself = %d, want 403", r.Status)
-	}
+	wantReason(t, "disable yourself", new(f.do(t, http.MethodPost, self, f.bia, nil, "")),
+		http.StatusForbidden, "SELF_ACTION")
 	if r := f.do(t, http.MethodPost, "/v1/admin/users/"+kim+"/disable", f.kim, nil, ""); r.Status != http.StatusForbidden {
 		t.Errorf("member disables = %d, want 403", r.Status)
 	}

@@ -15,6 +15,12 @@ const (
 	StatusDisabled = "disabled"
 )
 
+// Membership status values the admin endpoints read and write; tenant owns them.
+const (
+	MembershipActive   = "active"
+	MembershipDisabled = "disabled"
+)
+
 // User is one users row, with the email already decrypted: the repository is
 // the only place that sees the ciphertext, so services and handlers work with
 // the plain value. The struct deliberately holds no password: hashes live in

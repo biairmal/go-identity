@@ -12,12 +12,14 @@ const (
 	StatusSuspended = "suspended"
 )
 
-// Membership status values. A removed member keeps the row, so the audit
-// history and any later re-invite stay consistent.
+// Membership status values. A disabled member is blocked in this tenant only.
+// A removed member keeps the row, so the audit history and any later
+// re-invite stay consistent.
 const (
-	MemberInvited = "invited"
-	MemberActive  = "active"
-	MemberRemoved = "removed"
+	MemberInvited  = "invited"
+	MemberActive   = "active"
+	MemberDisabled = "disabled"
+	MemberRemoved  = "removed"
 )
 
 // Tenant is one tenant row. In single mode there is exactly one, created on

@@ -227,6 +227,13 @@ func (s *Service) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error 
 	return s.repo.RevokeAllForUser(ctx, userID, s.clock.Now())
 }
 
+// RevokeAllForUserInTenant revokes every live token of a user in one tenant,
+// which is what disabling their membership there does.
+func (s *Service) RevokeAllForUserInTenant(ctx context.Context, userID, tenantID uuid.UUID) error {
+	_, err := s.repo.RevokeAllForUserInTenant(ctx, userID, tenantID, s.clock.Now())
+	return err
+}
+
 // RevokeSession revokes one of the user's sessions (a family), so that
 // device cannot refresh again. A family that is not the user's, or has no
 // live token left, is an errorz.NotFound error, so IDs cannot be probed.

@@ -138,9 +138,7 @@ func TestInviteRefusals(t *testing.T) {
 	f := newAdminFixture(t)
 	wantReason(t, "invite the super admin", new(f.invite(t, testSuperAdmin.Email)),
 		http.StatusForbidden, "SUPER_ADMIN_PROTECTED")
-	if r := f.invite(t, "kim@example.com"); r.Status != http.StatusConflict {
-		t.Errorf("invite an active member = %d, want 409", r.Status)
-	}
+	wantReason(t, "invite an active member", new(f.invite(t, "kim@example.com")), http.StatusConflict, "ALREADY_MEMBER")
 	if r := f.invite(t, "x@example.com", "00000000-0000-0000-0000-000000000001"); r.Status != http.StatusBadRequest {
 		t.Errorf("invite with an unknown role = %d, want 400", r.Status)
 	}

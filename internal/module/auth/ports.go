@@ -114,7 +114,7 @@ type Membership struct {
 	Tenant TenantInfo
 	// Active is true when the membership allows acting in the tenant.
 	Active bool
-	// Status is the membership status: invited, active or removed.
+	// Status is the membership status: invited, active, disabled or removed.
 	Status string
 }
 

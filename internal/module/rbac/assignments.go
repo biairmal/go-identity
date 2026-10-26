@@ -185,39 +185,17 @@ func (s *Service) RemoveUserRoles(ctx context.Context, tenantID, userID uuid.UUI
 	return s.repo.UnassignRoles(ctx, tenantID, userID, nil)
 }
 
-// GuardRoleManagers runs change, which takes access away from userID (a
-// disable, a removal), and refuses it with LAST_ADMIN when it leaves a tenant
-// where the user held roles:manage without an active holder. It must run in
-// the caller's transaction, and takes the admin lock of each such tenant
-// first, in a fixed order, so it cannot deadlock with another guard.
+// GuardRoleManagers runs change, which takes access away from a member of the
+// tenant (a disable, a removal), and refuses it with LAST_ADMIN when it leaves
+// the tenant without an active roles:manage holder it had. It must run in the
+// caller's transaction, and takes the tenant's admin lock first.
 func (s *Service) GuardRoleManagers(
-	ctx context.Context, userID uuid.UUID, change func(context.Context) error,
+	ctx context.Context, tenantID uuid.UUID, change func(context.Context) error,
 ) error {
-	// ponytail: the tenants are read before their locks are taken, so a
-	// roles:manage grant to this user landing in between is not checked;
-	// re-read after locking if that window ever matters.
-	tenants, err := s.repo.ManagedTenants(ctx, userID)
-	if err != nil {
+	if err := database.LockXact(ctx, adminLock(tenantID)); err != nil {
 		return err
 	}
-	for _, t := range tenants {
-		if err := database.LockXact(ctx, adminLock(t)); err != nil {
-			return err
-		}
-	}
-	if err := change(ctx); err != nil {
-		return err
-	}
-	for _, t := range tenants {
-		n, err := s.repo.RoleManagers(ctx, t)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return apierr.New(apierr.ReasonLastAdmin)
-		}
-	}
-	return nil
+	return s.keepARoleManager(ctx, tenantID, func() error { return change(ctx) })
 }
 
 // addedRoles returns the IDs in ids the user does not hold yet.

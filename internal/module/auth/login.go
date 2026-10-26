@@ -247,23 +247,36 @@ func (s *Logins) pickTenant(
 			return nil, nil, err
 		}
 		t, err := s.tenants.Tenant(ctx, id)
-		return t, nil, err
+		if err != nil {
+			return nil, nil, err
+		}
+		disabled, err := isMemberDisabled(ctx, s.tenants, userID, t.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if disabled {
+			return nil, nil, apierr.New(apierr.ReasonAccountDisabled)
+		}
+		return t, nil, nil
 	}
 	all, err := s.tenants.Memberships(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}
+	disabled := slices.ContainsFunc(all, func(m Membership) bool {
+		return m.Status == memberDisabled && (slug == "" || m.Tenant.Slug == slug)
+	})
 	active := slices.DeleteFunc(all, func(m Membership) bool { return !m.Active })
 	if slug != "" {
 		i := slices.IndexFunc(active, func(m Membership) bool { return m.Tenant.Slug == slug })
 		if i < 0 {
-			return nil, nil, apierr.New(apierr.ReasonInvalidCredentials)
+			return nil, nil, notSignable(disabled)
 		}
 		return &active[i].Tenant, nil, nil
 	}
 	switch len(active) {
 	case 0:
-		return nil, nil, apierr.New(apierr.ReasonInvalidCredentials)
+		return nil, nil, notSignable(disabled)
 	case 1:
 		return &active[0].Tenant, nil, nil
 	}
@@ -272,6 +285,26 @@ func (s *Logins) pickTenant(
 		choice.Tenants = append(choice.Tenants, tenantSummary(&m.Tenant))
 	}
 	return nil, choice, nil
+}
+
+// isMemberDisabled reports whether userID's membership of tenantID is disabled.
+func isMemberDisabled(ctx context.Context, tenants Tenants, userID, tenantID uuid.UUID) (bool, error) {
+	all, err := tenants.Memberships(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(all, func(m Membership) bool {
+		return m.Tenant.ID == tenantID && m.Status == memberDisabled
+	}), nil
+}
+
+// notSignable is the refusal for a tenant the user cannot sign in to: their
+// membership there is disabled, or they have none.
+func notSignable(disabled bool) error {
+	if disabled {
+		return apierr.New(apierr.ReasonAccountDisabled)
+	}
+	return apierr.New(apierr.ReasonInvalidCredentials)
 }
 
 // complete records the sign-in and builds the token response in one
