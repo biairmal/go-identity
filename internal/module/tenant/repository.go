@@ -8,7 +8,9 @@ import (
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/biairmal/go-identity/internal/platform/apierr"
 	"github.com/biairmal/go-identity/internal/platform/database"
 )
 
@@ -43,6 +45,83 @@ func (r *Repository) EnsureBySlug(ctx context.Context, slug, name string) (*Tena
 		return nil, false, err
 	}
 	return t, created, nil
+}
+
+// uniqueViolation is the Postgres error code of a unique index conflict.
+const uniqueViolation = "23505"
+
+// Create inserts a tenant and returns it. A slug already in use is DUPLICATE.
+func (r *Repository) Create(ctx context.Context, slug, name string) (*Tenant, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`INSERT INTO tenants (slug, name) VALUES ($1, $2) RETURNING `+tenantColumns, slug, name)
+	t, err := scanTenant(row)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return nil, apierr.New(apierr.ReasonDuplicate)
+	}
+	return t, err
+}
+
+// TenantSummary is one tenant with its member count, for the admin list.
+type TenantSummary struct { //nolint:revive // named for its resource: the tenant package holds several summary types
+	Tenant
+	MemberCount int
+}
+
+// ListPage returns one page of tenants, newest first, with each tenant's
+// member count (members that have not been removed), and the total matching.
+// A non-empty status filters by status; a non-empty search matches the slug
+// or name case-insensitively.
+func (r *Repository) ListPage(
+	ctx context.Context, status, search string, limit, offset int,
+) ([]TenantSummary, int64, error) {
+	conn := database.Leader(ctx, r.db)
+	const where = ` FROM tenants t
+		WHERE ($1 = '' OR t.status = $1)
+		  AND ($2 = '' OR t.slug ILIKE '%' || $2 || '%' OR t.name ILIKE '%' || $2 || '%')`
+	var total int64
+	if err := conn.QueryRowContext(ctx, `SELECT count(*)`+where, status, search).Scan(&total); err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("tenant: count")
+	}
+	rows, err := conn.QueryContext(ctx,
+		`SELECT t.id, t.slug, t.name, t.status, t.version, t.created_at, t.updated_at,
+		   (SELECT count(*) FROM tenant_members m WHERE m.tenant_id = t.id AND m.status <> 'removed')`+where+`
+		 ORDER BY t.created_at DESC, t.id LIMIT $3 OFFSET $4`, status, search, limit, offset)
+	if err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("tenant: list page")
+	}
+	defer func() { _ = rows.Close() }()
+	var out []TenantSummary
+	for rows.Next() {
+		var s TenantSummary
+		if err := rows.Scan(&s.ID, &s.Slug, &s.Name, &s.Status, &s.Version,
+			&s.CreatedAt, &s.UpdatedAt, &s.MemberCount); err != nil {
+			return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("tenant: scan summary")
+		}
+		out = append(out, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("tenant: summary rows")
+	}
+	return out, total, nil
+}
+
+// Update writes a tenant's name and status and bumps its version, provided
+// the stored version is still version. A stale version is VERSION_CONFLICT,
+// and a missing row is not found.
+func (r *Repository) Update(ctx context.Context, id uuid.UUID, version int, name, status string) (*Tenant, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`UPDATE tenants SET name = $3, status = $4, version = version + 1, updated_at = now()
+		 WHERE id = $1 AND version = $2
+		 RETURNING `+tenantColumns, id, version, name, status)
+	t, err := scanTenant(row)
+	if errors.Is(err, errorz.ErrNotFound) {
+		if _, byID := r.ByID(ctx, id); byID != nil {
+			return nil, byID // not found
+		}
+		return nil, apierr.New(apierr.ReasonVersionConflict)
+	}
+	return t, err
 }
 
 // BySlug returns the tenant with slug, or errorz.NotFound.

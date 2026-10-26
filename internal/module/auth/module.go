@@ -10,6 +10,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/validator"
+	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/module/auth/keys"
 	"github.com/biairmal/go-identity/internal/module/auth/onetime"
@@ -162,6 +163,15 @@ func (m *Module) Tokens() *token.Builder { return m.tokens }
 // OneTime issues and consumes the single-use tokens the email flows put in
 // their links.
 func (m *Module) OneTime() *onetime.Service { return m.onetime }
+
+// InviteToTenant invites email into tenantID as its admin, granting roleIDs,
+// recording invitedBy as the inviter. internal/app calls it through the
+// tenant onboarding adapter, inside the tenant-creation transaction.
+func (m *Module) InviteToTenant(
+	ctx context.Context, tenantID, invitedBy uuid.UUID, email string, roleIDs []uuid.UUID,
+) error {
+	return m.invites.InviteToTenant(ctx, tenantID, invitedBy, email, roleIDs)
+}
 
 // SyncKeys records the loaded keys and their statuses, so an operator can see
 // which keys this deployment publishes. internal/app calls it at startup.

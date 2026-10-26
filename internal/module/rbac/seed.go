@@ -75,6 +75,35 @@ func (s *Service) SeedTenant(ctx context.Context, tenantID uuid.UUID) error {
 	return nil
 }
 
+// SeedTemplates creates the configured roles as templates (tenant_id NULL)
+// if they are missing, so a tenant created in multi mode copies the same
+// starting roles single mode seeds directly. It runs on every start, is gated
+// on SeedOnStart, and never overwrites an admin's later template edits.
+func (s *Service) SeedTemplates(ctx context.Context) error {
+	if !s.cfg.SeedOnStart {
+		return nil
+	}
+	for _, name := range s.cfg.RoleNames() {
+		existing, err := s.repo.RoleByName(ctx, nil, name)
+		if err == nil {
+			s.log.DebugWithContext(ctx, "template already exists, leaving it as the admin left it",
+				logger.F("template", existing.Name))
+			continue
+		}
+		if !isNotFound(err) {
+			return err
+		}
+		role, err := s.repo.CreateRole(ctx, nil, name, "", false)
+		if err != nil {
+			return err
+		}
+		if err := s.repo.SetRolePermissions(ctx, role.ID, s.cfg.Roles[name]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // seedRole creates one role with its grants, or leaves an existing role of
 // that name untouched.
 func (s *Service) seedRole(ctx context.Context, tenantID uuid.UUID, name string, keys []string) error {

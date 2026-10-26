@@ -77,6 +77,45 @@ type UserRolesResponse struct {
 	Roles []RoleRefResponse `json:"roles"`
 }
 
+// TemplateResponse is one role template (9.7): the roles copied into each new
+// tenant at creation.
+type TemplateResponse struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Permissions []string `json:"permissions"`
+	Version     int      `json:"version"`
+}
+
+// CreateTemplateRequest is the body of POST /v1/admin/role-templates.
+type CreateTemplateRequest struct {
+	Name        string   `json:"name" validate:"required,max=50"`
+	Description string   `json:"description" validate:"max=200"`
+	Permissions []string `json:"permissions"`
+}
+
+// UpdateTemplateRequest is the body of PATCH /v1/admin/role-templates/{id}.
+// Absent fields keep their value; a present permissions list replaces the
+// grants in full.
+type UpdateTemplateRequest struct {
+	Name        *string   `json:"name" validate:"omitnil,min=1,max=50"`
+	Description *string   `json:"description" validate:"omitnil,max=200"`
+	Permissions *[]string `json:"permissions"`
+	// Version stands in for the If-Match header.
+	Version *int `json:"version"`
+}
+
+// newTemplateResponse builds the response for a template granting keys.
+func newTemplateResponse(role *Role, keys []string) *TemplateResponse {
+	if keys == nil {
+		keys = []string{}
+	}
+	return &TemplateResponse{
+		ID: role.ID.String(), Name: role.Name, Description: role.Description,
+		Permissions: keys, Version: role.Version,
+	}
+}
+
 // newRoleResponse builds the response for role granting keys.
 func newRoleResponse(role *Role, keys []string) *RoleResponse {
 	if keys == nil {

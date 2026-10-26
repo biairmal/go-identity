@@ -436,6 +436,33 @@ func (a authRoles) CheckGrantable(ctx context.Context, roleIDs []uuid.UUID) erro
 	return a.svc.CheckGrantable(ctx, roleIDs)
 }
 
+// tenantOnboarding is the one back edge (TRD 3.1): a new tenant copies the
+// template roles through rbac and invites its first admin through auth.
+// internal/app sets it on the tenant service after auth is built, so the
+// tenant module still imports neither.
+type tenantOnboarding struct {
+	roles   *rbac.Service
+	invites *identityauth.Module
+}
+
+// firstAdminRole is the role the first admin of a new tenant is invited into;
+// it is copied from the templates at creation.
+const firstAdminRole = "admin"
+
+// CopyTemplateRoles copies every template role into the new tenant.
+func (o tenantOnboarding) CopyTemplateRoles(ctx context.Context, tenantID uuid.UUID) error {
+	return o.roles.CopyTemplateRoles(ctx, tenantID)
+}
+
+// InviteFirstAdmin invites email into the new tenant with its admin role.
+func (o tenantOnboarding) InviteFirstAdmin(ctx context.Context, tenantID, invitedBy uuid.UUID, email string) error {
+	role, err := o.roles.RoleByName(ctx, tenantID, firstAdminRole)
+	if err != nil {
+		return err
+	}
+	return o.invites.InviteToTenant(ctx, tenantID, invitedBy, email, []uuid.UUID{role.ID})
+}
+
 // GrantRoles grants the tenant's roles among roleIDs.
 func (a authRoles) GrantRoles(
 	ctx context.Context, tenantID, userID uuid.UUID, roleIDs []uuid.UUID, grantedBy *uuid.UUID,

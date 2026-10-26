@@ -52,4 +52,10 @@ func (m *Module) Register(rt *httpx.Routes) {
 	g.Patch("/roles/{id}", httpx.Handle(m.updateRole))
 	g.Delete("/roles/{id}", httpx.Handle(m.deleteRole))
 	g.Put("/roles/{id}/permissions", httpx.Handle(m.setPermissions))
+
+	// Role templates (9.7) are super-admin only and 404 in single mode.
+	rt.Super.Get("/role-templates", httpx.Handle(m.listTemplates))
+	rt.Super.Post("/role-templates", httpx.Handle(m.createTemplate))
+	rt.Super.Patch("/role-templates/{id}", httpx.Handle(m.updateTemplate))
+	rt.Super.Delete("/role-templates/{id}", httpx.Handle(m.deleteTemplate))
 }

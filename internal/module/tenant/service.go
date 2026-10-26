@@ -3,11 +3,16 @@ package tenant
 import (
 	"context"
 	"errors"
+	"strings"
 
+	"github.com/biairmal/go-sdk/lib/common/dto"
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/logger"
+	"github.com/biairmal/go-sdk/lib/validator"
 	"github.com/google/uuid"
 
+	"github.com/biairmal/go-identity/internal/platform/apierr"
+	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/scope"
 )
 
@@ -17,7 +22,17 @@ type Service struct {
 	repo  *Repository
 	audit AuditWriter
 	log   logger.Logger
+	// v validates admin request bodies; only the admin routes use it.
+	v validator.Validator
+	// onboarding copies the template roles and invites the first admin when
+	// a tenant is created. It is the one back edge (TRD 3.1), set by
+	// internal/app after auth is built; nil skips both steps.
+	onboarding Onboarding
 }
+
+// SetOnboarding wires the tenant-creation back edge. internal/app calls it
+// once, after the rbac and auth modules exist.
+func (s *Service) SetOnboarding(o Onboarding) { s.onboarding = o }
 
 // NewService returns a Service. audit may be nil, which skips the audit
 // writes; log may be nil.
@@ -85,6 +100,141 @@ func (s *Service) Current(ctx context.Context) (*Tenant, error) {
 		return nil, err
 	}
 	return s.repo.ByID(ctx, id)
+}
+
+// ListTenants returns one page of tenants (9.7). status and search are
+// optional filters.
+func (s *Service) ListTenants(
+	ctx context.Context, status, search string, page, size int,
+) (*TenantPageResponse, error) {
+	rows, total, err := s.repo.ListPage(ctx, status, strings.TrimSpace(search), size, (page-1)*size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]*TenantSummaryResponse, 0, len(rows))
+	for i := range rows {
+		r := &rows[i]
+		items = append(items, &TenantSummaryResponse{
+			ID: r.ID.String(), Slug: r.Slug, Name: r.Name, Status: r.Status,
+			MemberCount: r.MemberCount, CreatedAt: r.CreatedAt.UTC(), Version: r.Version,
+		})
+	}
+	return dto.NewPageResponse(items, total, page, size), nil
+}
+
+// GetTenant returns one tenant, or errorz.NotFound.
+func (s *Service) GetTenant(ctx context.Context, id uuid.UUID) (*TenantResponse, error) {
+	t, err := s.repo.ByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return newTenantResponse(t), nil
+}
+
+// CreateTenant creates a tenant, copies the template roles into it and
+// invites the first admin, all in one transaction (9.7). A slug already in
+// use is DUPLICATE.
+func (s *Service) CreateTenant(ctx context.Context, in *CreateTenantRequest) (*TenantResponse, error) {
+	in.Slug = strings.TrimSpace(in.Slug)
+	in.Name = strings.TrimSpace(in.Name)
+	in.FirstAdminEmail = strings.TrimSpace(in.FirstAdminEmail)
+	if err := s.v.ValidateStruct(in); err != nil {
+		return nil, err
+	}
+	if !slugPattern.MatchString(in.Slug) {
+		return nil, errorz.BadRequest().WithMessage("slug must match "+slugPattern.String()).
+			WithMeta(apierr.MetaFields, map[string]string{"slug": "must match " + slugPattern.String()})
+	}
+	actorID, err := scope.User(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out *TenantResponse
+	err = database.WithTx(ctx, s.repo.db, func(ctx context.Context) error {
+		t, err := s.repo.Create(ctx, in.Slug, in.Name)
+		if err != nil {
+			return err
+		}
+		if s.onboarding != nil {
+			if err := s.onboarding.CopyTemplateRoles(ctx, t.ID); err != nil {
+				return err
+			}
+			if err := s.onboarding.InviteFirstAdmin(ctx, t.ID, actorID, in.FirstAdminEmail); err != nil {
+				return err
+			}
+		}
+		out = newTenantResponse(t)
+		return s.writeAudit(ctx, &AuditEvent{
+			TenantID: t.ID, ActorID: actorID, Action: ActionTenantCreate,
+			TargetType: TargetTenant, TargetID: t.ID.String(),
+			After: map[string]any{"slug": t.Slug, "name": t.Name, "first_admin_email": in.FirstAdminEmail},
+		})
+	})
+	return out, err
+}
+
+// UpdateTenant renames a tenant or changes its status (9.7). The default
+// tenant cannot be suspended. Requires the current version (If-Match).
+func (s *Service) UpdateTenant(
+	ctx context.Context, id uuid.UUID, version int, in *UpdateTenantRequest,
+) (*TenantResponse, error) {
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		in.Name = &name
+	}
+	if err := s.v.ValidateStruct(in); err != nil {
+		return nil, err
+	}
+	actorID, err := scope.User(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out *TenantResponse
+	err = database.WithTx(ctx, s.repo.db, func(ctx context.Context) error {
+		t, err := s.repo.ByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if t.Version != version {
+			return apierr.New(apierr.ReasonVersionConflict)
+		}
+		name, status := t.Name, t.Status
+		if in.Name != nil {
+			name = *in.Name
+		}
+		if in.Status != nil {
+			status = *in.Status
+		}
+		if status == StatusSuspended && t.Slug == s.cfg.DefaultTenantSlug {
+			return errorz.BadRequest().WithMessage("the default tenant cannot be suspended").
+				WithMeta(apierr.MetaFields, map[string]string{"status": "the default tenant cannot be suspended"})
+		}
+		updated, err := s.repo.Update(ctx, id, version, name, status)
+		if err != nil {
+			return err
+		}
+		out = newTenantResponse(updated)
+		return s.writeAudit(ctx, &AuditEvent{
+			TenantID: id, ActorID: actorID, Action: statusChangeAction(t.Status, status),
+			TargetType: TargetTenant, TargetID: id.String(),
+			Before: map[string]any{"name": t.Name, "status": t.Status},
+			After:  map[string]any{"name": updated.Name, "status": updated.Status},
+		})
+	})
+	return out, err
+}
+
+// statusChangeAction names the audit action for a tenant update: a suspend or
+// reactivate when the status changed, otherwise a plain update.
+func statusChangeAction(before, after string) string {
+	switch {
+	case before != StatusSuspended && after == StatusSuspended:
+		return ActionTenantSuspend
+	case before == StatusSuspended && after == StatusActive:
+		return ActionTenantReactivate
+	default:
+		return ActionTenantUpdate
+	}
 }
 
 // AddMember makes a user a member of a tenant and records it.

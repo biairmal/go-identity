@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	sdkauth "github.com/biairmal/go-sdk/lib/auth"
+	"github.com/biairmal/go-sdk/lib/authz"
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/httpkit"
 	"github.com/biairmal/go-sdk/lib/httpkit/handler"
@@ -47,7 +48,7 @@ func (a *App) routes(modules []Module, chain []func(http.Handler) http.Handler) 
 		r.Method(http.MethodGet, a.cfg.Metrics.Path, promhttp.HandlerFor(a.metrics, promhttp.HandlerOpts{}))
 	}
 
-	rt := groups(r)
+	rt := groups(r, a.cfg.Modules.Tenant.Multi())
 	for _, m := range modules {
 		m.Register(&rt)
 	}
@@ -55,8 +56,9 @@ func (a *App) routes(modules []Module, chain []func(http.Handler) http.Handler) 
 }
 
 // groups mounts /v1 and its audience groups. A group's own middleware (token
-// restrictions, service-token scope) is added here and nowhere else.
-func groups(r chi.Router) httpx.Routes {
+// restrictions, service-token scope) is added here and nowhere else. multi is
+// the tenancy mode: the super-admin group answers 404 in single mode.
+func groups(r chi.Router, multi bool) httpx.Routes {
 	rt := httpx.Routes{Root: r}
 	r.Route("/v1", func(v1 chi.Router) {
 		rt.API = v1
@@ -64,10 +66,33 @@ func groups(r chi.Router) httpx.Routes {
 		v1.Route("/admin", func(g chi.Router) {
 			g.Use(rbac.Memoize) // admin permission checks read the caller's grants once per request
 			rt.Admin = g
+			// The super-admin routes (9.7) are a sub-group that requires the
+			// sa claim and answers 404 in single mode.
+			rt.Super = g.With(requireSuperAdmin(multi))
 		})
 		v1.Route("/internal", func(g chi.Router) { rt.Internal = g })
 	})
 	return rt
+}
+
+// requireSuperAdmin guards the 9.7 routes: 404 in single mode (they do not
+// exist there), else the sa claim, or 403. Requests without claims (auth
+// disabled) carry no sa claim, so they are refused too.
+func requireSuperAdmin(multi bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !multi {
+				handler.WriteErrorResponse(w, http.StatusNotFound, errorz.NotFound().WithMessage("route not found"))
+				return
+			}
+			if !authz.IsSuperAdmin(r.Context()) {
+				handler.WriteErrorResponse(w, http.StatusForbidden,
+					errorz.Forbidden().WithMessage("super admin only"))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // scopedRoutes lists, per token scope, the only routes a token carrying that

@@ -106,6 +106,42 @@ func (r *Repository) RoleInTenant(ctx context.Context, tenantID, id uuid.UUID) (
 	return scanRole(row)
 }
 
+// TemplateByID returns one template (a role with no tenant), or
+// errorz.NotFound. A tenant's own role is not found.
+func (r *Repository) TemplateByID(ctx context.Context, id uuid.UUID) (*Role, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`SELECT `+roleColumns+` FROM roles WHERE id = $1 AND tenant_id IS NULL`, id)
+	return scanRole(row)
+}
+
+// UpdateTemplate writes a template's name and description and bumps its
+// version, provided the stored version is still version. A stale version is
+// VERSION_CONFLICT, a duplicate name is DUPLICATE.
+func (r *Repository) UpdateTemplate(
+	ctx context.Context, id uuid.UUID, version int, name, description string,
+) (*Role, error) {
+	row := database.Leader(ctx, r.db).QueryRowContext(ctx,
+		`UPDATE roles SET name = $3, description = $4, version = version + 1, updated_at = now()
+		 WHERE id = $1 AND tenant_id IS NULL AND version = $2
+		 RETURNING `+roleColumns, id, version, name, description)
+	role, err := scanRole(row)
+	if isNotFound(err) {
+		return nil, httpx.ErrVersionConflict()
+	}
+	return role, err
+}
+
+// DeleteTemplate deletes a template. Its grants go with it (ON DELETE
+// CASCADE); tenants already created keep their copied roles.
+func (r *Repository) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
+	_, err := database.Leader(ctx, r.db).ExecContext(ctx,
+		`DELETE FROM roles WHERE id = $1 AND tenant_id IS NULL`, id)
+	if err != nil {
+		return errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: delete template")
+	}
+	return nil
+}
+
 // UpdateRole writes a role's name and description and bumps its version,
 // provided the stored version is still version. A stale version is
 // VERSION_CONFLICT.
