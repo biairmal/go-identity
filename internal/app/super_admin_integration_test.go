@@ -200,3 +200,63 @@ func TestSuperAdminRoutesRequireSaClaim(t *testing.T) {
 		t.Errorf("tenant admin GET /v1/admin/role-templates = %d, want 403", r.Status)
 	}
 }
+
+// TestTenantCreateAuditHoldsNoAddress keeps the first admin's address out of
+// the append-only audit log.
+func TestTenantCreateAuditHoldsNoAddress(t *testing.T) {
+	f := newSuperFixture(t)
+	f.createTenant(t, "globex", "Globex", "admin@globex.test")
+	if n := f.count(t, `SELECT count(*) FROM audit_log WHERE action = 'tenant.create'`); n != 2 {
+		t.Fatalf("tenant.create rows = %d, want 2 (default and globex)", n)
+	}
+	if n := f.count(t, `SELECT count(*) FROM audit_log WHERE before::text LIKE '%globex.test%'
+		OR after::text LIKE '%globex.test%'`); n != 0 {
+		t.Errorf("%d audit rows hold the first admin's address", n)
+	}
+}
+
+// TestTemplateAuditIsPlatformLevel writes template events with the names of
+// APP_FLOW 17 and no tenant, so no tenant's admins read them.
+func TestTemplateAuditIsPlatformLevel(t *testing.T) {
+	f := newSuperFixture(t)
+	r := f.do(t, http.MethodPost, "/v1/admin/role-templates", f.super,
+		map[string]any{"name": "viewer", "permissions": []string{}}, "")
+	if r.Status != http.StatusCreated {
+		t.Fatalf("create template = %d %s", r.Status, r.Raw)
+	}
+	id := r.Data["id"].(string)
+	f.do(t, http.MethodPatch, "/v1/admin/role-templates/"+id, f.super, map[string]any{"name": "viewers"}, `"1"`)
+	f.do(t, http.MethodDelete, "/v1/admin/role-templates/"+id, f.super, nil, "")
+	for _, action := range []string{"role_template.create", "role_template.update", "role_template.delete"} {
+		if n := f.count(t, `SELECT count(*) FROM audit_log WHERE action = $1 AND tenant_id IS NULL`, action); n != 1 {
+			t.Errorf("%s rows without a tenant = %d, want 1", action, n)
+		}
+	}
+	if n := f.count(t, `SELECT count(*) FROM audit_log WHERE action LIKE 'template.%'`); n != 0 {
+		t.Errorf("%d audit rows use the old template.* names", n)
+	}
+}
+
+// TestCreateTenantWithoutAdminTemplate says what is wrong when the templates
+// have no admin role, instead of answering 404, and creates nothing.
+func TestCreateTenantWithoutAdminTemplate(t *testing.T) {
+	f := newSuperFixture(t)
+	f.exec(t, `DELETE FROM roles WHERE tenant_id IS NULL AND name = 'admin'`)
+	r := f.do(t, http.MethodPost, "/v1/admin/tenants", f.super,
+		map[string]any{"slug": "acme", "name": "Acme", "first_admin_email": "a@acme.test"}, "")
+	if r.Status != http.StatusConflict {
+		t.Errorf("create without an admin template = %d %s, want 409", r.Status, r.Raw)
+	}
+	if n := f.count(t, `SELECT count(*) FROM tenants WHERE slug = 'acme'`); n != 0 {
+		t.Error("the failed create left a tenant behind")
+	}
+}
+
+// TestSingleModeKeepsNoTemplates leaves the templates table alone until the
+// deployment moves to multi mode.
+func TestSingleModeKeepsNoTemplates(t *testing.T) {
+	f := newLoginFixture(t, nil) // single mode
+	if n := f.count(t, `SELECT count(*) FROM roles WHERE tenant_id IS NULL`); n != 0 {
+		t.Errorf("single mode seeded %d templates, want 0", n)
+	}
+}

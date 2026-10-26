@@ -457,6 +457,12 @@ func (o tenantOnboarding) CopyTemplateRoles(ctx context.Context, tenantID uuid.U
 // InviteFirstAdmin invites email into the new tenant with its admin role.
 func (o tenantOnboarding) InviteFirstAdmin(ctx context.Context, tenantID, invitedBy uuid.UUID, email string) error {
 	role, err := o.roles.RoleByName(ctx, tenantID, firstAdminRole)
+	if errors.Is(err, errorz.ErrNotFound) {
+		// The templates have no "admin" role to copy, so there is nobody to
+		// invite as admin. The caller can fix it, so say so rather than 404.
+		return errorz.Conflict().WithMessage(
+			"tenant: the role templates have no '" + firstAdminRole + "' role; create it before adding a tenant")
+	}
 	if err != nil {
 		return err
 	}

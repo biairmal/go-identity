@@ -19,10 +19,13 @@ func (a *App) bootstrap(ctx context.Context, svc *services) error {
 		if err := svc.rbac.SyncCatalog(ctx); err != nil {
 			return err
 		}
-		// Templates are the source a new tenant copies its roles from, so
-		// they are seeded before any tenant can be created.
-		if err := svc.rbac.SeedTemplates(ctx); err != nil {
-			return err
+		// Templates are the source a new tenant copies its roles from, so they
+		// are seeded before any tenant can be created. Single mode creates no
+		// tenants, so it keeps no templates; a restart in multi mode seeds them.
+		if a.cfg.Modules.Tenant.Multi() {
+			if err := svc.rbac.SeedTemplates(ctx); err != nil {
+				return err
+			}
 		}
 		if err := svc.auth.SyncKeys(ctx); err != nil {
 			return err

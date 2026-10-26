@@ -167,7 +167,7 @@ func (s *Service) CreateTenant(ctx context.Context, in *CreateTenantRequest) (*T
 		return s.writeAudit(ctx, &AuditEvent{
 			TenantID: t.ID, ActorID: actorID, Action: ActionTenantCreate,
 			TargetType: TargetTenant, TargetID: t.ID.String(),
-			After: map[string]any{"slug": t.Slug, "name": t.Name, "first_admin_email": in.FirstAdminEmail},
+			After: map[string]any{"slug": t.Slug, "name": t.Name}, // never the first admin's address: the log is append-only
 		})
 	})
 	return out, err

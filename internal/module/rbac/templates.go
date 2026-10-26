@@ -16,6 +16,8 @@ import (
 // Only the super admin manages them, which the route group enforces, so these
 // methods do not check permissions. Editing a template changes only tenants
 // created afterwards.
+// Their audit rows carry no tenant: a template belongs to the platform, so no
+// tenant's admins see them.
 
 // ListTemplates returns every template with its permission keys.
 func (s *Service) ListTemplates(ctx context.Context) ([]*TemplateResponse, error) {
@@ -45,7 +47,7 @@ func (s *Service) CreateTemplate(ctx context.Context, in *CreateTemplateRequest)
 	if err := s.checkKnownKeys(ctx, keys); err != nil {
 		return nil, err
 	}
-	actorID, tenantID, err := superActor(ctx)
+	actorID, err := scope.User(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +62,7 @@ func (s *Service) CreateTemplate(ctx context.Context, in *CreateTemplateRequest)
 		}
 		out = newTemplateResponse(role, keys)
 		return s.writeAudit(ctx, &AuditEvent{
-			TenantID: tenantID, ActorID: actorID, Action: ActionTemplateCreate,
+			ActorID: actorID, Action: ActionTemplateCreate,
 			TargetType: TargetTemplate, TargetID: role.ID.String(),
 			After: map[string]any{"name": role.Name, "description": role.Description, "permissions": out.Permissions},
 		})
@@ -87,7 +89,7 @@ func (s *Service) UpdateTemplate(
 			return nil, err
 		}
 	}
-	actorID, tenantID, err := superActor(ctx)
+	actorID, err := scope.User(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +128,7 @@ func (s *Service) UpdateTemplate(
 		}
 		out = newTemplateResponse(updated, after)
 		return s.writeAudit(ctx, &AuditEvent{
-			TenantID: tenantID, ActorID: actorID, Action: ActionTemplateUpdate,
+			ActorID: actorID, Action: ActionTemplateUpdate,
 			TargetType: TargetTemplate, TargetID: id.String(),
 			Before: map[string]any{"name": tpl.Name, "description": tpl.Description, "permissions": nonNil(before)},
 			After:  map[string]any{"name": updated.Name, "description": updated.Description, "permissions": after},
@@ -138,7 +140,7 @@ func (s *Service) UpdateTemplate(
 // DeleteTemplate removes a template. Tenants already created keep their copied
 // roles.
 func (s *Service) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
-	actorID, tenantID, err := superActor(ctx)
+	actorID, err := scope.User(ctx)
 	if err != nil {
 		return err
 	}
@@ -151,7 +153,7 @@ func (s *Service) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 			return err
 		}
 		return s.writeAudit(ctx, &AuditEvent{
-			TenantID: tenantID, ActorID: actorID, Action: ActionTemplateDelete,
+			ActorID: actorID, Action: ActionTemplateDelete,
 			TargetType: TargetTemplate, TargetID: id.String(),
 			Before: map[string]any{"name": tpl.Name},
 		})
@@ -176,16 +178,4 @@ func (s *Service) checkKnownKeys(ctx context.Context, keys []string) error {
 		}
 	}
 	return nil
-}
-
-// superActor is the super admin's user and current tenant, for the audit row
-// of a template change. The route group has already checked the sa claim.
-func superActor(ctx context.Context) (userID, tenantID uuid.UUID, err error) {
-	if userID, err = scope.User(ctx); err != nil {
-		return uuid.Nil, uuid.Nil, err
-	}
-	if tenantID, err = scope.Tenant(ctx); err != nil {
-		return uuid.Nil, uuid.Nil, err
-	}
-	return userID, tenantID, nil
 }

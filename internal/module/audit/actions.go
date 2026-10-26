@@ -39,6 +39,11 @@ const (
 	ActionRoleDelete        Action = "role.delete"
 	ActionRolePermissions   Action = "role.permissions"
 	ActionUserRolesAssigned Action = "user.roles_assigned"
+
+	// Role templates are platform-level, so their events carry no tenant.
+	ActionRoleTemplateCreate Action = "role_template.create"
+	ActionRoleTemplateUpdate Action = "role_template.update"
+	ActionRoleTemplateDelete Action = "role_template.delete"
 )
 
 // Tenant events.
