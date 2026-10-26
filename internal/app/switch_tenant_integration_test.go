@@ -187,3 +187,15 @@ func TestSingleToMultiMigrationKeepsUsersAndRoles(t *testing.T) {
 		t.Errorf("GET /v1/admin/roles after migration = %d %s, want 200", roles.Status, roles.Raw)
 	}
 }
+
+// TestSwitchTenantAuditUsesTheSharedActionName writes the action audit/actions.go
+// names, so the admin audit filter finds it.
+func TestSwitchTenantAuditUsesTheSharedActionName(t *testing.T) {
+	f := newSwitchFixture(t)
+	if sw := f.switchTo(t, f.acme); sw.Status != http.StatusOK {
+		t.Fatalf("switch = %d %s", sw.Status, sw.Raw)
+	}
+	if n := f.count(t, `SELECT count(*) FROM audit_log WHERE action = 'auth.tenant_switch'`); n != 1 {
+		t.Errorf("auth.tenant_switch rows = %d, want 1", n)
+	}
+}
