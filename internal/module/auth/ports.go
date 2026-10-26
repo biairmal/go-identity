@@ -229,6 +229,7 @@ const (
 	ActionLoginFailed    = "auth.login_failed"
 	ActionLogout         = "auth.logout"
 	ActionLogoutAll      = "auth.logout_all"
+	ActionSwitchTenant   = "auth.switch_tenant"
 	ActionRefreshReuse   = "auth.refresh_reuse"
 	ActionPasswordReset  = "auth.password_reset"
 	ActionPasswordChange = "auth.password_change"
