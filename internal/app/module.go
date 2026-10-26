@@ -64,6 +64,7 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 	tenantModule := tenant.New(cfg.Modules.Tenant, tenant.Deps{
 		DB:    deps.DB,
 		Log:   deps.Log,
+		V:     deps.V,
 		Audit: tenantAudit{w: auditModule.Writer()},
 	})
 
@@ -115,6 +116,11 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// The one back edge (TRD 3.1): tenant creation copies the template roles
+	// and invites the first admin, so the tenant service needs rbac and auth.
+	// It is wired here, after auth is built, not through New.
+	tenantModule.Service().SetOnboarding(tenantOnboarding{roles: rbacModule.Service(), invites: authModule})
 
 	modules := []Module{auditModule, tenantModule, rbacModule, authModule, sessionModule, userModule}
 	return modules, &services{

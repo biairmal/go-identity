@@ -30,10 +30,14 @@ const (
 	ActionRoleDelete        = "role.delete"
 	ActionRolePermissions   = "role.permissions"
 	ActionUserRolesAssigned = "user.roles_assigned"
+	ActionTemplateCreate    = "template.create"
+	ActionTemplateUpdate    = "template.update"
+	ActionTemplateDelete    = "template.delete"
 )
 
-// TargetRole and TargetUser are the target types this module records.
+// Target types this module records.
 const (
-	TargetRole = "role"
-	TargetUser = "user"
+	TargetRole     = "role"
+	TargetUser     = "user"
+	TargetTemplate = "template"
 )

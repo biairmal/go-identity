@@ -10,5 +10,6 @@ type Routes struct {
 	API      chi.Router // /v1, authenticated unless an auth rule makes the path public
 	Me       chi.Router // /v1/me: the target is the caller, no extra permission
 	Admin    chi.Router // /v1/admin: every route adds r.With(middleware.RequirePermission(az, perm))
+	Super    chi.Router // /v1/admin super-admin routes (9.7): the sa claim, and 404 in single mode
 	Internal chi.Router // /v1/internal: service tokens only
 }

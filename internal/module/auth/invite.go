@@ -84,7 +84,28 @@ func (s *Invites) Invite(ctx context.Context, in *InviteRequest) error {
 	if err := s.roles.CheckGrantable(ctx, in.RoleIDs); err != nil {
 		return err
 	}
-	roleIDs := in.RoleIDs
+	return database.WithTx(ctx, s.db, func(ctx context.Context) error {
+		return s.invite(ctx, tenantID, actorID, in.Email, in.DisplayName, in.RoleIDs)
+	})
+}
+
+// InviteToTenant invites email into tenantID as its first admin, granting
+// roleIDs, recording invitedBy as the inviter. It is the tenant-creation path
+// (T6.1): the tenant is the new one, so it is explicit, and it joins the
+// caller's transaction instead of opening its own, so the invite rolls back
+// with the tenant if anything fails.
+func (s *Invites) InviteToTenant(
+	ctx context.Context, tenantID, invitedBy uuid.UUID, email string, roleIDs []uuid.UUID,
+) error {
+	return s.invite(ctx, tenantID, invitedBy, strings.TrimSpace(email), "", roleIDs)
+}
+
+// invite runs the shared invite work in the caller's transaction: find or
+// create the account, make it an invited member (an active or disabled member
+// is ALREADY_MEMBER), replace any earlier link, mail a new one and audit it.
+func (s *Invites) invite(
+	ctx context.Context, tenantID, actorID uuid.UUID, email, displayName string, roleIDs []uuid.UUID,
+) error {
 	if roleIDs == nil {
 		roleIDs = []uuid.UUID{}
 	}
@@ -100,36 +121,34 @@ func (s *Invites) Invite(ctx context.Context, in *InviteRequest) error {
 	if err != nil {
 		return err
 	}
-	return database.WithTx(ctx, s.db, func(ctx context.Context) error {
-		a, created, err := s.findOrCreate(ctx, in)
-		if err != nil {
-			return err
-		}
-		previous, err := s.tenants.InviteMember(ctx, tenantID, a.ID)
-		if err != nil {
-			return err
-		}
-		if previous == memberActive || previous == memberDisabled {
-			return apierr.New(apierr.ReasonAlreadyMember)
-		}
-		if err := s.tokRepo.DeleteUnusedForUserInTenant(ctx, a.ID, tenantID, onetime.PurposeInvite); err != nil {
-			return err
-		}
-		issued, err := s.tokens.Create(ctx, a.ID, onetime.PurposeInvite, inviteTTL,
-			onetime.Options{TenantID: &tenantID, Payload: payload})
-		if err != nil {
-			return err
-		}
-		if err := mail.Queue(ctx, s.outbox, templates.InviteMessage(a.Email, issued.Raw, map[string]string{
-			"InviterName": inviter.DisplayName, "TenantName": tenant.Name,
-		})); err != nil {
-			return err
-		}
-		return s.audit.Write(ctx, &AuditEvent{
-			TenantID: tenantID, ActorID: actorID, Action: ActionUserInvite,
-			TargetType: TargetUser, TargetID: a.ID.String(),
-			After: map[string]any{"role_ids": roleIDs, "new_account": created},
-		})
+	a, created, err := s.findOrCreate(ctx, &InviteRequest{Email: email, DisplayName: displayName})
+	if err != nil {
+		return err
+	}
+	previous, err := s.tenants.InviteMember(ctx, tenantID, a.ID)
+	if err != nil {
+		return err
+	}
+	if previous == memberActive || previous == memberDisabled {
+		return apierr.New(apierr.ReasonAlreadyMember)
+	}
+	if err := s.tokRepo.DeleteUnusedForUserInTenant(ctx, a.ID, tenantID, onetime.PurposeInvite); err != nil {
+		return err
+	}
+	issued, err := s.tokens.Create(ctx, a.ID, onetime.PurposeInvite, inviteTTL,
+		onetime.Options{TenantID: &tenantID, Payload: payload})
+	if err != nil {
+		return err
+	}
+	if err := mail.Queue(ctx, s.outbox, templates.InviteMessage(a.Email, issued.Raw, map[string]string{
+		"InviterName": inviter.DisplayName, "TenantName": tenant.Name,
+	})); err != nil {
+		return err
+	}
+	return s.audit.Write(ctx, &AuditEvent{
+		TenantID: tenantID, ActorID: actorID, Action: ActionUserInvite,
+		TargetType: TargetUser, TargetID: a.ID.String(),
+		After: map[string]any{"role_ids": roleIDs, "new_account": created},
 	})
 }
 

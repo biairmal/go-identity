@@ -145,6 +145,275 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/admin/role-templates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The roles copied into each new tenant at creation. Super admin only; 404 in single mode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "List role templates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-array_internal_module_rbac_TemplateResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a template copied into tenants created afterwards. Super admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "Create a role template",
+                "parameters": [
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_module_rbac.CreateTemplateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_TemplateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body or unknown permission",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "409": {
+                        "description": "DUPLICATE name",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/admin/role-templates/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a template. Tenants already created keep their copied roles. Super admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "Delete a role template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Template not found, or single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Renames a template or replaces its permissions; affects only tenants created later.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "Update a role template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Template version, e.g. \\",
+                        "name": "If-Match",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_module_rbac.UpdateTemplateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_TemplateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body or unknown permission",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Template not found, or single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "409": {
+                        "description": "DUPLICATE or VERSION_CONFLICT",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "428": {
+                        "description": "No version given",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/admin/roles": {
             "get": {
                 "security": [
@@ -571,6 +840,310 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "LAST_ADMIN or VERSION_CONFLICT",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "428": {
+                        "description": "No version given",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/admin/tenants": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "One page of tenants. Super admin only; 404 in single mode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "List tenants",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page, 1-based",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size, max 100",
+                        "name": "size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "active or suspended",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Slug or name contains, case-insensitive",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantPageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a tenant, copies the template roles and invites the first admin. Super admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "Create a tenant",
+                "parameters": [
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_module_tenant.CreateTenantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "409": {
+                        "description": "DUPLICATE slug",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/admin/tenants/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "One tenant. Super admin only; 404 in single mode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "Get a tenant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant not found, or single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Renames a tenant or suspends/reactivates it. The default tenant cannot be suspended.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "superadmin"
+                ],
+                "summary": "Update a tenant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tenant ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tenant version, e.g. \\",
+                        "name": "If-Match",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_module_tenant.UpdateTenantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body, or the default tenant cannot be suspended",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the super admin",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant not found, or single mode",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "409": {
+                        "description": "VERSION_CONFLICT",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -2471,6 +3044,28 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_module_rbac.CreateTemplateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "internal_module_rbac.PermissionResponse": {
             "type": "object",
             "properties": {
@@ -2609,6 +3204,29 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_module_rbac.TemplateResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "internal_module_rbac.UpdateRoleRequest": {
             "type": "object",
             "properties": {
@@ -2620,6 +3238,30 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50,
                     "minLength": 1
+                },
+                "version": {
+                    "description": "Version stands in for the If-Match header.",
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_module_rbac.UpdateTemplateRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "version": {
                     "description": "Version stands in for the If-Match header.",
@@ -2659,6 +3301,124 @@ const docTemplate = `{
                 },
                 "user_agent": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_module_tenant.CreateTenantRequest": {
+            "type": "object",
+            "required": [
+                "first_admin_email",
+                "name"
+            ],
+            "properties": {
+                "first_admin_email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_module_tenant.TenantPageResponse": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "type": "boolean"
+                },
+                "has_prev": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_module_tenant.TenantSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_module_tenant.TenantResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_module_tenant.TenantSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_module_tenant.UpdateTenantRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "suspended"
+                    ]
+                },
+                "version": {
+                    "description": "Version stands in for the If-Match header.",
+                    "type": "integer"
                 }
             }
         },
@@ -2830,6 +3590,27 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/internal_module_rbac.PermissionResponse"
+                    }
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-array_internal_module_rbac_TemplateResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_module_rbac.TemplateResponse"
                     }
                 },
                 "error": {},
@@ -3024,6 +3805,24 @@ const docTemplate = `{
                 }
             }
         },
+        "response.BaseResponse-internal_module_rbac_TemplateResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/internal_module_rbac.TemplateResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "response.BaseResponse-internal_module_rbac_UserRolesResponse": {
             "type": "object",
             "properties": {
@@ -3032,6 +3831,42 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/internal_module_rbac.UserRolesResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-internal_module_tenant_TenantPageResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/internal_module_tenant.TenantPageResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-internal_module_tenant_TenantResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/internal_module_tenant.TenantResponse"
                 },
                 "error": {},
                 "message": {
