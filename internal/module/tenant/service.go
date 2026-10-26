@@ -101,7 +101,7 @@ func (s *Service) AddMember(ctx context.Context, tenantID, userID uuid.UUID, sta
 
 // EnsureActiveMember makes a user an active member of a tenant: it adds the
 // membership when there is none, reactivates an invited or removed one, and
-// leaves an active one alone. Every change is audited; a no-op is not.
+// leaves an active or disabled one alone: only an admin enables a membership. Every change is audited; a no-op is not.
 func (s *Service) EnsureActiveMember(ctx context.Context, tenantID, userID uuid.UUID) error {
 	m, err := s.repo.Member(ctx, tenantID, userID)
 	switch {
@@ -109,7 +109,7 @@ func (s *Service) EnsureActiveMember(ctx context.Context, tenantID, userID uuid.
 		return s.AddMember(ctx, tenantID, userID, MemberActive)
 	case err != nil:
 		return err
-	case m.Active():
+	case m.Active(), m.Status == MemberDisabled:
 		return nil
 	}
 	if err := s.repo.SetMemberStatus(ctx, tenantID, userID, MemberActive); err != nil {
@@ -125,7 +125,7 @@ func (s *Service) EnsureActiveMember(ctx context.Context, tenantID, userID uuid.
 
 // InviteMember makes a user an invited member of a tenant: it adds the
 // membership when there is none and re-invites a removed one, and leaves an
-// invited or active one alone. It returns the status before the call ("" for
+// invited, active or disabled one alone. It returns the status before the call ("" for
 // none). Every change is audited.
 func (s *Service) InviteMember(ctx context.Context, tenantID, userID uuid.UUID) (string, error) {
 	m, err := s.repo.Member(ctx, tenantID, userID)
@@ -146,6 +146,16 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, userID uuid.UUID) 
 		Before: map[string]any{"status": m.Status},
 		After:  map[string]any{"status": MemberInvited},
 	})
+}
+
+// DisableMember blocks a user in one tenant. Only an admin's enable undoes it.
+func (s *Service) DisableMember(ctx context.Context, tenantID, userID uuid.UUID) error {
+	return s.repo.SetMemberStatus(ctx, tenantID, userID, MemberDisabled)
+}
+
+// EnableMember lets a disabled membership act in its tenant again.
+func (s *Service) EnableMember(ctx context.Context, tenantID, userID uuid.UUID) error {
+	return s.repo.SetMemberStatus(ctx, tenantID, userID, MemberActive)
 }
 
 // RemoveMember marks a membership removed and records who did it. The row

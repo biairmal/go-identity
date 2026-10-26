@@ -22,7 +22,7 @@ const (
 // userListQuery is what GET /v1/admin/users accepts besides page and size.
 var userListQuery = listquery.ListParseConfig{
 	AllowedSortFields:   []string{"display_name", "created_at"},
-	AllowedFilterFields: []string{"status", "role"},
+	AllowedFilterFields: []string{"status", "membership_status", "role"},
 	AllowedParams:       []string{"search"},
 }
 
@@ -50,6 +50,7 @@ func badQuery(field, msg string) error {
 //	@Param       size   query int    false "Page size, max 100"
 //	@Param       sort   query string false "display_name or created_at, then ,ASC or ,DESC"
 //	@Param       status query string false "pending, active or disabled"
+//	@Param       membership_status query string false "invited, active or disabled, in this tenant"
 //	@Param       role   query string false "Role ID"
 //	@Param       search query string false "Display name contains, or the exact email"
 //	@Security    BearerAuth
@@ -72,6 +73,14 @@ func (m *Module) listUsers(r *http.Request) (any, error) {
 			lq.Status = f.Value
 		default:
 			return nil, badQuery("status", "must be pending, active or disabled")
+		}
+	}
+	if f, ok := params.Filters["membership_status"]; ok {
+		switch f.Value {
+		case "invited", MembershipActive, MembershipDisabled:
+			lq.MembershipStatus = f.Value
+		default:
+			return nil, badQuery("membership_status", "must be invited, active or disabled")
 		}
 	}
 	if f, ok := params.Filters["role"]; ok {
@@ -109,14 +118,14 @@ func (m *Module) getUser(r *http.Request) (any, error) {
 // disableUser answers POST /v1/admin/users/{id}/disable with 204.
 //
 //	@Summary     Disable a user
-//	@Description Blocks sign-in and revokes every session. Disabling yourself is refused.
+//	@Description Disables the membership in this tenant, not the account; revokes their sessions here. Not yourself.
 //	@Tags        admin
 //	@Produce     json
 //	@Param       id path string true "User ID"
 //	@Security    BearerAuth
 //	@Success     204
 //	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
-//	@Failure     403 {object} response.BaseResponse[any] "Missing users:manage, yourself, or SUPER_ADMIN_PROTECTED"
+//	@Failure     403 {object} response.BaseResponse[any] "Missing users:manage, SELF_ACTION, or SUPER_ADMIN_PROTECTED"
 //	@Failure     404 {object} response.BaseResponse[any] "Not a member of the tenant"
 //	@Failure     409 {object} response.BaseResponse[any] "LAST_ADMIN"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
@@ -128,7 +137,7 @@ func (m *Module) disableUser(r *http.Request) (any, error) {
 // enableUser answers POST /v1/admin/users/{id}/enable with 204.
 //
 //	@Summary     Enable a user
-//	@Description Lets a disabled user sign in again.
+//	@Description Lets a disabled member act in the caller's tenant again.
 //	@Tags        admin
 //	@Produce     json
 //	@Param       id path string true "User ID"

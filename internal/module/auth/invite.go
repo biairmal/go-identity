@@ -33,8 +33,9 @@ const inviteTTL = 7 * 24 * time.Hour
 
 // Membership status values, as the tenant module stores them.
 const (
-	memberInvited = "invited"
-	memberActive  = "active"
+	memberInvited  = "invited"
+	memberActive   = "active"
+	memberDisabled = "disabled"
 )
 
 // Invites runs invite, preview and accept (APP_FLOW 10). An invite finds or
@@ -68,7 +69,8 @@ type invitePayload struct {
 
 // Invite invites email into the caller's tenant with role IDs the caller may
 // grant. Re-inviting an invited or removed member replaces the earlier link;
-// an active member is a 409, and the super admin is SUPER_ADMIN_PROTECTED.
+// an active or disabled member is 409 ALREADY_MEMBER, and the super admin is
+// SUPER_ADMIN_PROTECTED.
 func (s *Invites) Invite(ctx context.Context, in *InviteRequest) error {
 	in.Email = strings.TrimSpace(in.Email)
 	in.DisplayName = strings.TrimSpace(in.DisplayName)
@@ -107,8 +109,8 @@ func (s *Invites) Invite(ctx context.Context, in *InviteRequest) error {
 		if err != nil {
 			return err
 		}
-		if previous == memberActive {
-			return errorz.Conflict().WithMessage("auth: already a member of this tenant")
+		if previous == memberActive || previous == memberDisabled {
+			return apierr.New(apierr.ReasonAlreadyMember)
 		}
 		if err := s.tokRepo.DeleteUnusedForUserInTenant(ctx, a.ID, tenantID, onetime.PurposeInvite); err != nil {
 			return err
@@ -347,7 +349,7 @@ const (
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid body or unknown role"
 //	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
 //	@Failure     403 {object} response.BaseResponse[any] "No users:manage, PERMISSION_NOT_HELD, SUPER_ADMIN_PROTECTED"
-//	@Failure     409 {object} response.BaseResponse[any] "Already an active member"
+//	@Failure     409 {object} response.BaseResponse[any] "ALREADY_MEMBER: an active or disabled member"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/admin/users/invite [post]
 func (m *Module) inviteUser(r *http.Request) (any, error) {

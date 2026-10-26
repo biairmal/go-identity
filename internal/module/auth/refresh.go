@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"slices"
 
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/logger"
@@ -138,25 +137,22 @@ func (s *Refreshes) recheck(ctx context.Context, issued *IssuedSession) (*Accoun
 	if !tenant.Active {
 		return nil, nil, apierr.New(apierr.ReasonTenantSuspended)
 	}
-	member, err := s.isActiveMember(ctx, a.ID, tenant.ID)
+	all, err := s.tenants.Memberships(ctx, a.ID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if !member {
-		return nil, nil, apierr.New(apierr.ReasonInvalidCredentials)
+	for _, m := range all {
+		if m.Tenant.ID != tenant.ID {
+			continue
+		}
+		switch {
+		case m.Active:
+			return a, tenant, nil
+		case m.Status == memberDisabled:
+			return nil, nil, apierr.New(apierr.ReasonAccountDisabled)
+		}
 	}
-	return a, tenant, nil
-}
-
-// isActiveMember reports whether userID is an active member of tenantID.
-func (s *Refreshes) isActiveMember(ctx context.Context, userID, tenantID uuid.UUID) (bool, error) {
-	all, err := s.tenants.Memberships(ctx, userID)
-	if err != nil {
-		return false, err
-	}
-	return slices.ContainsFunc(all, func(m Membership) bool {
-		return m.Active && m.Tenant.ID == tenantID
-	}), nil
+	return nil, nil, apierr.New(apierr.ReasonInvalidCredentials)
 }
 
 // revokeAndFail revokes the family of an account that may no longer refresh,

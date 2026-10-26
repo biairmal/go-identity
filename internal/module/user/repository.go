@@ -215,7 +215,9 @@ type MemberFilter struct {
 	// exactly (by blind index).
 	Search string
 	Status string
-	RoleID *uuid.UUID
+	// MembershipStatus filters on the status of the membership in the tenant.
+	MembershipStatus string
+	RoleID           *uuid.UUID
 	// OrderBy is a list of allow-listed column expressions with direction.
 	OrderBy []string
 	Limit   int
@@ -242,6 +244,7 @@ const memberFrom = `
 	JOIN tenant_members tm ON tm.user_id = u.id AND tm.tenant_id = $1 AND tm.status <> 'removed'
 	WHERE ($2 = '' OR u.display_name ILIKE '%' || $2 || '%' OR u.email_hash = $3)
 	  AND ($4 = '' OR u.status = $4)
+	  AND ($6 = '' OR tm.status = $6)
 	  AND ($5::uuid IS NULL OR EXISTS (
 	      SELECT 1 FROM user_roles ur WHERE ur.tenant_id = tm.tenant_id AND ur.user_id = u.id AND ur.role_id = $5))`
 
@@ -253,7 +256,7 @@ func (r *Repository) ListMembers(ctx context.Context, tenantID uuid.UUID, f *Mem
 	if f.Search != "" {
 		hash = r.cipher.BlindIndex(NormalizeEmail(f.Search))
 	}
-	args := []any{tenantID, f.Search, hash, f.Status, f.RoleID}
+	args := []any{tenantID, f.Search, hash, f.Status, f.RoleID, f.MembershipStatus}
 	var total int64
 	if err := conn.QueryRowContext(ctx, `SELECT count(*)`+memberFrom, args...).Scan(&total); err != nil {
 		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: count members")
@@ -264,7 +267,7 @@ func (r *Repository) ListMembers(ctx context.Context, tenantID uuid.UUID, f *Mem
 	}
 	rows, err := conn.QueryContext(ctx,
 		`SELECT `+memberColumns+memberFrom+`
-		 ORDER BY `+order+`u.id LIMIT $6 OFFSET $7`, append(args, f.Limit, f.Offset)...)
+		 ORDER BY `+order+`u.id LIMIT $7 OFFSET $8`, append(args, f.Limit, f.Offset)...)
 	if err != nil {
 		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("user: list members")
 	}

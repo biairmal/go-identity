@@ -698,6 +698,10 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [pending, active, disabled] }
+        - name: membership_status
+          in: query
+          description: The membership in the caller's tenant.
+          schema: { type: string, enum: [invited, active, disabled] }
         - name: role
           in: query
           schema: { type: string, format: uuid }
@@ -854,8 +858,10 @@ paths:
       tags: [admin]
       summary: Disable a user
       description: |
-        Requires users:manage. Revokes their sessions. Refused for the super
-        admin, for the last roles:manage holder, and for yourself.
+        Requires users:manage. Disables the membership in the caller's tenant,
+        not the account, and revokes their sessions in this tenant only.
+        Refused for the super admin, for the last roles:manage holder of the
+        tenant, and for yourself (SELF_ACTION).
       operationId: disableUser
       parameters:
         - $ref: "#/components/parameters/PathID"
@@ -870,7 +876,9 @@ paths:
     post:
       tags: [admin]
       summary: Enable a user
-      description: Requires users:manage.
+      description: |
+        Requires users:manage. A disabled membership becomes active again;
+        any other is left alone.
       operationId: enableUser
       parameters:
         - $ref: "#/components/parameters/PathID"
@@ -1575,7 +1583,7 @@ components:
         Authenticated but not allowed. Reasons include EMAIL_NOT_VERIFIED,
         ACCOUNT_DISABLED, PASSWORD_CHANGE_REQUIRED, TENANT_SUSPENDED,
         NOT_A_MEMBER, REGISTRATION_CLOSED, PERMISSION_NOT_HELD,
-        SELF_ESCALATION, SYSTEM_ROLE, SUPER_ADMIN_PROTECTED,
+        SELF_ESCALATION, SYSTEM_ROLE, SUPER_ADMIN_PROTECTED, SELF_ACTION,
         OAUTH_EMAIL_UNVERIFIED and OAUTH_DOMAIN_NOT_ALLOWED.
       content:
         application/json:
@@ -1592,8 +1600,8 @@ components:
     Conflict:
       description: |
         The change conflicts with the current state. Reasons include
-        VERSION_CONFLICT, DUPLICATE, LAST_ADMIN, ROLE_IN_USE and
-        LAST_SIGN_IN_METHOD.
+        VERSION_CONFLICT, DUPLICATE, LAST_ADMIN, ROLE_IN_USE,
+        LAST_SIGN_IN_METHOD and ALREADY_MEMBER.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
@@ -1682,6 +1690,8 @@ components:
         - SYSTEM_ROLE
         - ROLE_IN_USE
         - SUPER_ADMIN_PROTECTED
+        - SELF_ACTION
+        - ALREADY_MEMBER
         - VERSION_CONFLICT
         - DUPLICATE
         - RATE_LIMITED
@@ -1877,7 +1887,7 @@ components:
         email: { type: string, format: email }
         display_name: { type: string }
         status: { type: string, enum: [pending, active, disabled] }
-        membership_status: { type: string, enum: [invited, active, removed] }
+        membership_status: { type: string, enum: [invited, active, disabled, removed] }
         roles:
           type: array
           items: { $ref: "#/components/schemas/RoleRef" }

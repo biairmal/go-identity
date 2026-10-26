@@ -290,33 +290,6 @@ func (r *Repository) Member(
 	return status, superAdmin, nil
 }
 
-// ManagedTenants lists, in a fixed order, the tenants where the user is an
-// active holder of roles:manage.
-func (r *Repository) ManagedTenants(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := database.Leader(ctx, r.db).QueryContext(ctx,
-		`SELECT DISTINCT ur.tenant_id
-		 FROM user_roles ur
-		 JOIN role_permissions rp ON rp.role_id = ur.role_id AND rp.permission_key = $2`+activeHolder+`
-		 WHERE ur.user_id = $1
-		 ORDER BY ur.tenant_id`, userID, PermRolesManage)
-	if err != nil {
-		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: managed tenants")
-	}
-	defer func() { _ = rows.Close() }()
-	var out []uuid.UUID
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: scan tenant")
-		}
-		out = append(out, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("rbac: tenant rows")
-	}
-	return out, nil
-}
-
 // activeHolder joins an assignment to an active user with an active
 // membership; only those count as holding a permission.
 const activeHolder = `

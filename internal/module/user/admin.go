@@ -31,12 +31,13 @@ type Admin struct {
 
 // ListQuery is a parsed GET /v1/admin/users query.
 type ListQuery struct {
-	Search string
-	Status string
-	RoleID *uuid.UUID
-	Sorts  []dto.SortSpec
-	Page   int
-	Size   int
+	Search           string
+	Status           string
+	MembershipStatus string
+	RoleID           *uuid.UUID
+	Sorts            []dto.SortSpec
+	Page             int
+	Size             int
 }
 
 // List returns one page of the tenant's members with their roles.
@@ -46,7 +47,8 @@ func (a *Admin) List(ctx context.Context, q *ListQuery) (*AdminUserPageResponse,
 		return nil, err
 	}
 	f := &MemberFilter{
-		Search: q.Search, Status: q.Status, RoleID: q.RoleID, Limit: q.Size, Offset: (q.Page - 1) * q.Size,
+		Search: q.Search, Status: q.Status, MembershipStatus: q.MembershipStatus, RoleID: q.RoleID,
+		Limit: q.Size, Offset: (q.Page - 1) * q.Size,
 	}
 	for _, s := range q.Sorts {
 		dir := " ASC"
@@ -108,41 +110,43 @@ func (a *Admin) Get(ctx context.Context, id uuid.UUID) (*AdminUserDetailResponse
 	}, nil
 }
 
-// Disable blocks the account from signing in and revokes all its sessions.
-// The account is global, so this applies in every tenant it belongs to, and
-// LAST_ADMIN is checked in each of them. Disabling yourself is refused;
-// disabling a disabled account changes nothing.
+// Disable blocks the user in the caller's tenant: the membership becomes
+// disabled and their sessions in this tenant are revoked. The account and the
+// user's other tenants are untouched, and LAST_ADMIN is checked in this tenant
+// only. Disabling yourself is SELF_ACTION; disabling a disabled member
+// changes nothing.
 func (a *Admin) Disable(ctx context.Context, id uuid.UUID) error {
 	actorID, tenantID, err := caller(ctx)
 	if err != nil {
 		return err
 	}
 	if id == actorID {
-		return errorz.Forbidden().WithMessage("user: you cannot disable your own account")
+		return apierr.New(apierr.ReasonSelfAction)
 	}
 	return database.WithTx(ctx, a.db, func(ctx context.Context) error {
 		m, err := a.target(ctx, tenantID, id)
-		if err != nil || m.Status == StatusDisabled {
+		if err != nil || m.MembershipStatus == MembershipDisabled {
 			return err
 		}
-		if err := a.roles.GuardRoleManagers(ctx, id, func(ctx context.Context) error {
-			return a.repo.UpdateStatus(ctx, id, m.Version, StatusDisabled)
+		if err := a.roles.GuardRoleManagers(ctx, tenantID, func(ctx context.Context) error {
+			return a.members.DisableMember(ctx, tenantID, id)
 		}); err != nil {
 			return err
 		}
-		if err := a.sessions.RevokeAllForUser(ctx, id); err != nil {
+		if err := a.sessions.RevokeAllForUserInTenant(ctx, id, tenantID); err != nil {
 			return err
 		}
 		return a.audit.Write(ctx, &AuditEvent{
 			TenantID: tenantID, ActorID: actorID, Action: ActionUserDisable,
 			TargetType: TargetUser, TargetID: id.String(),
-			Before: map[string]any{"status": m.Status}, After: map[string]any{"status": StatusDisabled},
+			Before: map[string]any{"membership_status": m.MembershipStatus},
+			After:  map[string]any{"membership_status": MembershipDisabled},
 		})
 	})
 }
 
-// Enable lets a disabled account sign in again. Any other account is left as
-// it is, so enabling never skips email verification.
+// Enable lets a disabled member act in the caller's tenant again. Any other
+// member is left as they are.
 func (a *Admin) Enable(ctx context.Context, id uuid.UUID) error {
 	actorID, tenantID, err := caller(ctx)
 	if err != nil {
@@ -150,16 +154,17 @@ func (a *Admin) Enable(ctx context.Context, id uuid.UUID) error {
 	}
 	return database.WithTx(ctx, a.db, func(ctx context.Context) error {
 		m, err := a.target(ctx, tenantID, id)
-		if err != nil || m.Status != StatusDisabled {
+		if err != nil || m.MembershipStatus != MembershipDisabled {
 			return err
 		}
-		if err := a.repo.UpdateStatus(ctx, id, m.Version, StatusActive); err != nil {
+		if err := a.members.EnableMember(ctx, tenantID, id); err != nil {
 			return err
 		}
 		return a.audit.Write(ctx, &AuditEvent{
 			TenantID: tenantID, ActorID: actorID, Action: ActionUserEnable,
 			TargetType: TargetUser, TargetID: id.String(),
-			Before: map[string]any{"status": StatusDisabled}, After: map[string]any{"status": StatusActive},
+			Before: map[string]any{"membership_status": MembershipDisabled},
+			After:  map[string]any{"membership_status": MembershipActive},
 		})
 	})
 }
@@ -175,7 +180,7 @@ func (a *Admin) Remove(ctx context.Context, id uuid.UUID) error {
 		if _, err := a.target(ctx, tenantID, id); err != nil {
 			return err
 		}
-		return a.roles.GuardRoleManagers(ctx, id, func(ctx context.Context) error {
+		return a.roles.GuardRoleManagers(ctx, tenantID, func(ctx context.Context) error {
 			if err := a.roles.RemoveAll(ctx, tenantID, id); err != nil {
 				return err
 			}

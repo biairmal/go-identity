@@ -31,6 +31,8 @@ const (
 	ReasonSystemRole             Reason = "SYSTEM_ROLE"
 	ReasonRoleInUse              Reason = "ROLE_IN_USE"
 	ReasonSuperAdminProtected    Reason = "SUPER_ADMIN_PROTECTED"
+	ReasonSelfAction             Reason = "SELF_ACTION"
+	ReasonAlreadyMember          Reason = "ALREADY_MEMBER"
 	ReasonVersionConflict        Reason = "VERSION_CONFLICT"
 	ReasonDuplicate              Reason = "DUPLICATE"
 	ReasonRateLimited            Reason = "RATE_LIMITED"
@@ -66,6 +68,8 @@ var reasonCodes = map[Reason]string{ //nolint:dupl // the test pins the same tab
 	ReasonSystemRole:             errorz.CodeForbidden,
 	ReasonRoleInUse:              errorz.CodeConflict,
 	ReasonSuperAdminProtected:    errorz.CodeForbidden,
+	ReasonSelfAction:             errorz.CodeForbidden,
+	ReasonAlreadyMember:          errorz.CodeConflict,
 	ReasonVersionConflict:        errorz.CodeConflict,
 	ReasonDuplicate:              errorz.CodeConflict,
 	ReasonRateLimited:            errorz.CodeTooManyRequests,
