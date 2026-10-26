@@ -25,6 +25,10 @@ const (
 	resetPasswordPath  = "/auth/password/reset"
 )
 
+// switchTenantPath is authenticated (not public): the token identifies the
+// caller, and the body names the tenant to move to.
+const switchTenantPath = "/auth/switch-tenant"
+
 // getAuthConfig answers GET /v1/auth/config. Configuration is fixed for the
 // life of the process, so the response is built once in New.
 //
@@ -133,6 +137,31 @@ func (m *Module) login(r *http.Request) (any, error) {
 		return nil, err
 	}
 	return m.logins.Login(r.Context(), &in, device(r))
+}
+
+// switchTenant answers POST /v1/auth/switch-tenant with a token response for
+// another of the caller's tenants, in a new refresh family.
+//
+//	@Summary     Switch tenant
+//	@Description Trades the caller's token for one in another of their tenants. Multi mode only.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.SwitchTenantRequest true "Request body"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[auth.TokenResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     403 {object} response.BaseResponse[any] "NOT_A_MEMBER, ACCOUNT_DISABLED or TENANT_SUSPENDED"
+//	@Failure     404 {object} response.BaseResponse[any] "Single mode"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/switch-tenant [post]
+func (m *Module) switchTenant(r *http.Request) (any, error) {
+	var in SwitchTenantRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	return m.switches.Switch(r.Context(), &in, device(r))
 }
 
 // refresh answers POST /v1/auth/refresh with a new token response.

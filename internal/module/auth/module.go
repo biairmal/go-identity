@@ -42,6 +42,8 @@ type Module struct {
 	resets *PasswordResets
 	// invites runs invite, preview and accept.
 	invites *Invites
+	// switches runs switch-tenant.
+	switches *Switches
 	// az guards the admin invite route.
 	az authz.Authorizer
 	// limiter rate-limits the public sign-in and sign-up routes; nil
@@ -154,6 +156,10 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		tx: tx, v: v, users: deps.Users, tenants: deps.Tenants, sessions: deps.Sessions,
 		audit: deps.Audit, limiter: deps.RefreshLimiter, issue: issue, clock: clk, log: log,
 	}
+	m.switches = &Switches{
+		tenancy: deps.Tenancy, tx: tx, v: v, users: deps.Users, tenants: deps.Tenants,
+		sessions: deps.Sessions, audit: deps.Audit, issue: issue, log: log,
+	}
 	return m, nil
 }
 
@@ -185,6 +191,7 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.Root.Method(http.MethodGet, jwksPath, sdkauth.JWKSHandler(m.keys.Public))
 	rt.API.Get(authConfigPath, httpx.Handle(m.getAuthConfig))
 	rt.API.Post(loginPath, httpx.Handle(m.login))
+	rt.API.Post(switchTenantPath, httpx.Handle(m.switchTenant))
 	rt.API.Post(refreshPath, httpx.Handle(m.refresh))
 	rt.API.Post(logoutPath, httpx.Handle(m.logout))
 	rt.API.Post(logoutAllPath, httpx.Handle(m.logoutAll))

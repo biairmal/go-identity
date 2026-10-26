@@ -82,6 +82,11 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required,max=256"`
 }
 
+// SwitchTenantRequest is the body of POST /v1/auth/switch-tenant.
+type SwitchTenantRequest struct {
+	TenantID uuid.UUID `json:"tenant_id" validate:"required"`
+}
+
 // TokenResponse is the payload of every endpoint that signs a user in. A
 // restricted token (forced password change) carries no refresh token.
 type TokenResponse struct {
