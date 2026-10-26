@@ -1,6 +1,10 @@
 package rbac
 
 import (
+	"hash/fnv"
+	"sort"
+	"strings"
+
 	"github.com/biairmal/go-sdk/lib/common/dto"
 	"github.com/google/uuid"
 )
@@ -125,4 +129,42 @@ func newRoleResponse(role *Role, keys []string) *RoleResponse {
 		ID: role.ID.String(), Name: role.Name, Description: role.Description,
 		IsSystem: role.IsSystem, Permissions: keys, Version: role.Version,
 	}
+}
+
+// InternalRoleMapResponse is GET /v1/internal/roles/permissions?tenant_id=
+// (TRD 9.8), consumed by go-sdk authz source identity.
+type InternalRoleMapResponse struct {
+	TenantID string              `json:"tenant_id"`
+	Roles    map[string][]string `json:"roles"`
+	// Version changes whenever any role or its permissions change in this
+	// tenant, so a caller can tell the map moved without comparing its
+	// contents.
+	Version int64 `json:"version"`
+}
+
+// newInternalRoleMapResponse builds the response, computing its version from
+// the map's own content.
+func newInternalRoleMapResponse(tenantID uuid.UUID, roles map[string][]string) *InternalRoleMapResponse {
+	return &InternalRoleMapResponse{TenantID: tenantID.String(), Roles: roles, Version: roleMapVersion(roles)}
+}
+
+// roleMapVersion fingerprints a role map, sorting role names and each role's
+// permission keys first, so the result does not depend on map order.
+func roleMapVersion(roles map[string][]string) int64 {
+	names := make([]string, 0, len(roles))
+	for name := range roles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	h := fnv.New64a()
+	for _, name := range names {
+		perms := append([]string{}, roles[name]...)
+		sort.Strings(perms)
+		_, _ = h.Write([]byte(name))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(strings.Join(perms, ",")))
+		_, _ = h.Write([]byte{0})
+	}
+	return int64(h.Sum64()) //nolint:gosec // a fingerprint, not a security value: wrapping to negative is fine
 }

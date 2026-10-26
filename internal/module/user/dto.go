@@ -84,6 +84,19 @@ func NewUserResponse(u *User) UserResponse {
 	}
 }
 
+// InternalUserResponse is GET /v1/internal/users/{id} (TRD 9.8): no email, so
+// a resource service never learns an address it has no business seeing.
+type InternalUserResponse struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Status      string `json:"status"`
+}
+
+// newInternalUserResponse maps a user row to its internal-API shape.
+func newInternalUserResponse(u *User) *InternalUserResponse {
+	return &InternalUserResponse{ID: u.ID.String(), DisplayName: u.DisplayName, Status: u.Status}
+}
+
 // utc returns t in UTC, or nil.
 func utc(t *time.Time) *time.Time {
 	if t == nil {

@@ -75,4 +75,6 @@ func (m *Module) Register(rt *httpx.Routes) {
 	manage.Post("/users/{id}/disable", httpx.Handle(m.disableUser))
 	manage.Post("/users/{id}/enable", httpx.Handle(m.enableUser))
 	manage.Delete("/users/{id}", httpx.Handle(m.removeUser))
+
+	rt.Internal.Get("/users/{id}", httpx.Handle(m.getInternalUser))
 }

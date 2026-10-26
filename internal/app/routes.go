@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
-	"slices"
+	"strings"
 
 	sdkauth "github.com/biairmal/go-sdk/lib/auth"
 	"github.com/biairmal/go-sdk/lib/authz"
@@ -70,7 +70,10 @@ func groups(r chi.Router, multi bool) httpx.Routes {
 			// sa claim and answers 404 in single mode.
 			rt.Super = g.With(requireSuperAdmin(multi))
 		})
-		v1.Route("/internal", func(g chi.Router) { rt.Internal = g })
+		v1.Route("/internal", func(g chi.Router) {
+			g.Use(requireServiceScope)
+			rt.Internal = g
+		})
 	})
 	return rt
 }
@@ -95,17 +98,67 @@ func requireSuperAdmin(multi bool) func(http.Handler) http.Handler {
 	}
 }
 
+// requireServiceScope guards /v1/internal (9.8): only a token with
+// scope:internal, from POST /v1/auth/token, may call these routes. Requests
+// without claims (auth disabled, or an ordinary user token) carry no such
+// scope, so they are refused too.
+func requireServiceScope(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := sdkauth.ClaimsFromContext(r.Context())
+		var scope string
+		if ok {
+			if raw, has := claims.Get(identitytoken.ClaimScope); has {
+				if s, isString := raw.(string); isString {
+					scope = s
+				}
+			}
+		}
+		if scope != identitytoken.ScopeInternal {
+			handler.WriteErrorResponse(w, http.StatusForbidden, errorz.Forbidden().WithMessage("service token required"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // scopedRoutes lists, per token scope, the only routes a token carrying that
 // scope may call. Every other authenticated route rejects any token with a
 // scope claim. A route serving a scoped token is listed here when it is
-// mounted.
+// mounted. A path ending in "*" matches by prefix, for routes with an {id}.
 var scopedRoutes = map[string][]scopedRoute{
 	// A forced password change: the token may only choose a new password.
 	identitytoken.ScopePasswordChange: {{http.MethodPost, "/v1/me/password"}},
+	// A service token (TRD 9.8): only the internal routes.
+	identitytoken.ScopeInternal: {
+		{http.MethodGet, "/v1/internal/users/*"},
+		{http.MethodGet, "/v1/internal/tenants/*"},
+		{http.MethodGet, "/v1/internal/roles/permissions"},
+	},
 }
 
-// scopedRoute is one method and exact path.
+// scopedRoute is one method and path, or path prefix when it ends in "*".
 type scopedRoute struct{ method, path string }
+
+// matches reports whether method and path satisfy r.
+func (r scopedRoute) matches(method, path string) bool {
+	if r.method != method {
+		return false
+	}
+	if prefix, ok := strings.CutSuffix(r.path, "*"); ok {
+		return strings.HasPrefix(path, prefix)
+	}
+	return r.path == path
+}
+
+// routeAllowed reports whether method and path match one of allowed.
+func routeAllowed(allowed []scopedRoute, method, path string) bool {
+	for _, r := range allowed {
+		if r.matches(method, path) {
+			return true
+		}
+	}
+	return false
+}
 
 // restrictScopedTokens rejects a request whose validated token carries a
 // scope claim, unless allowed lists the route for that scope. A
@@ -129,7 +182,7 @@ func restrictScopedTokens(allowed map[string][]scopedRoute) func(http.Handler) h
 			if !isString {
 				scope = ""
 			}
-			if slices.Contains(allowed[scope], scopedRoute{r.Method, r.URL.Path}) {
+			if routeAllowed(allowed[scope], r.Method, r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}

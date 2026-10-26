@@ -48,6 +48,34 @@ func (m *Module) listPermissions(r *http.Request) (any, error) {
 	return out, nil
 }
 
+// getInternalRolePermissions answers GET
+// /v1/internal/roles/permissions?tenant_id= (TRD 9.8). Service tokens only,
+// by service_token scope middleware.
+//
+//	@Summary     Role permission map (internal)
+//	@Description The role name to permissions map of one tenant, for go-sdk authz source identity. Service tokens only.
+//	@Tags        internal
+//	@Produce     json
+//	@Param       tenant_id query string true "Tenant ID"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[rbac.InternalRoleMapResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Missing or invalid tenant_id"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     403 {object} response.BaseResponse[any] "Not a service token"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/internal/roles/permissions [get]
+func (m *Module) getInternalRolePermissions(r *http.Request) (any, error) {
+	tenantID, err := uuid.Parse(r.URL.Query().Get("tenant_id"))
+	if err != nil {
+		return nil, errorz.BadRequest().WithMessage("tenant_id must be a tenant ID")
+	}
+	roles, err := m.svc.TenantRoleMap(r.Context(), tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return newInternalRoleMapResponse(tenantID, roles), nil
+}
+
 // listRoles answers GET /v1/admin/roles with one page of the tenant's roles.
 //
 //	@Summary     List roles

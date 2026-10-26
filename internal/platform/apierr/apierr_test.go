@@ -41,6 +41,8 @@ func TestReasonStatuses(t *testing.T) {
 		ReasonVersionConflict:        http.StatusConflict,
 		ReasonDuplicate:              http.StatusConflict,
 		ReasonRateLimited:            http.StatusTooManyRequests,
+		ReasonInvalidClient:          http.StatusUnauthorized,
+		ReasonUnsupportedGrantType:   http.StatusBadRequest,
 	}
 	if len(want) != len(reasonCodes) {
 		t.Fatalf("test covers %d reasons, table has %d", len(want), len(reasonCodes))

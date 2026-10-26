@@ -31,6 +31,11 @@ const (
 // issued at sign-in while a password change is forced.
 const ScopePasswordChange = "password_change"
 
+// ScopeInternal restricts a token to /v1/internal. It is issued by
+// POST /v1/auth/token to a resource service presenting client credentials
+// (TRD 9.4, 9.8).
+const ScopeInternal = "internal"
+
 // Claims modes, mirroring modules.auth.token.claims.
 const (
 	ClaimsRoles               = "roles"
@@ -143,3 +148,27 @@ func (b *Builder) Access(_ context.Context, s *Subject, tenantID uuid.UUID) (str
 
 // PublicKeys returns the keys to publish, for the JWKS endpoint.
 func (b *Builder) PublicKeys() []auth.PublicKey { return b.keys.Public() }
+
+// Service signs a scope:internal token for a resource service, carrying only
+// sub (the client ID), jti and scope: no tenant, no roles, since a service
+// token acts on no one's behalf (TRD 9.4).
+func (b *Builder) Service(_ context.Context, clientID string, ttl time.Duration) (string, error) {
+	now := b.clock.Now()
+	extra := map[string]any{
+		ClaimTokenID: uuid.NewString(),
+		ClaimScope:   ScopeInternal,
+	}
+	opts := []auth.IssueOption{
+		auth.WithTTL(ttl),
+		auth.WithIssuedAt(now),
+		auth.WithExtraClaims(extra),
+	}
+	if len(b.cfg.Audience) > 0 {
+		opts = append(opts, auth.WithAudience(b.cfg.Audience[0]))
+	}
+	signed, err := b.issuer.Issue(clientID, opts...)
+	if err != nil {
+		return "", errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("token: sign service token")
+	}
+	return signed, nil
+}

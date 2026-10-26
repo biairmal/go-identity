@@ -44,6 +44,8 @@ type Module struct {
 	invites *Invites
 	// switches runs switch-tenant.
 	switches *Switches
+	// serviceTokens runs POST /v1/auth/token for resource services.
+	serviceTokens *ServiceTokens
 	// az guards the admin invite route.
 	az authz.Authorizer
 	// limiter rate-limits the public sign-in and sign-up routes; nil
@@ -160,6 +162,7 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		tenancy: deps.Tenancy, tx: tx, v: v, users: deps.Users, tenants: deps.Tenants,
 		sessions: deps.Sessions, audit: deps.Audit, issue: issue, log: log,
 	}
+	m.serviceTokens = &ServiceTokens{cfg: &m.cfg, v: v, tokens: builder}
 	return m, nil
 }
 
@@ -200,6 +203,7 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.API.Post(resendVerifyPath, httpx.Handle(m.resendVerification))
 	rt.API.Post(forgotPasswordPath, httpx.Handle(m.forgotPassword))
 	rt.API.Post(resetPasswordPath, httpx.Handle(m.resetPassword))
+	rt.API.Post(serviceTokenPath, httpx.Handle(m.issueServiceToken))
 	rt.API.Get(invitePreviewPath, httpx.Handle(m.previewInvite))
 	rt.API.Post(inviteAcceptPath, httpx.Handle(m.acceptInvite))
 	rt.Admin.With(middleware.RequirePermission(m.az, permUsersManage)).Post(adminInvitePath, httpx.Handle(m.inviteUser))
