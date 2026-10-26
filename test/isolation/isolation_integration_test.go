@@ -175,6 +175,75 @@ func TestListRoutesAreTenantScoped(t *testing.T) {
 	}
 }
 
+// TestCrossTenantWritesStayInTheCallersTenant covers the routes that take no
+// ID in the path: A's admin cannot hand out B's role IDs (they are unknown
+// roles, 400, never granted), inviting an address that belongs to B reveals
+// nothing and leaves B's membership alone, a role A creates never shows in
+// B, and the /me routes show only the caller's own data.
+func TestCrossTenantWritesStayInTheCallersTenant(t *testing.T) {
+	w := newWorld(t)
+
+	// Invite with B's role ID: unknown to A's tenant.
+	r := w.do(t, http.MethodPost, "/v1/admin/users/invite", w.tokenA,
+		map[string]any{"email": "new-a@example.com", "role_ids": []string{w.roleB}})
+	if r.Status != http.StatusBadRequest {
+		t.Errorf("invite with B's role = %d %s, want 400", r.Status, r.Raw)
+	}
+
+	// Assign B's role to a member of A: unknown role, nothing granted.
+	w.register(t, "member-a@example.com", "Member A", "default")
+	memberA := w.text(t, `SELECT id::text FROM users WHERE display_name = 'Member A'`)
+	r = w.do(t, http.MethodPut, "/v1/admin/users/"+memberA+"/roles", w.tokenA,
+		map[string]any{"role_ids": []string{w.roleB}})
+	if r.Status != http.StatusBadRequest {
+		t.Errorf("assign B's role = %d %s, want 400", r.Status, r.Raw)
+	}
+	if n := w.text(t, `SELECT count(*)::text FROM user_roles WHERE role_id = $1 AND user_id = $2`,
+		w.roleB, memberA); n != "0" {
+		t.Errorf("B's role was granted to A's member (%s rows)", n)
+	}
+
+	// Inviting B's admin from A answers like any other address and leaves B alone.
+	before := w.text(t, `SELECT m.status FROM tenant_members m JOIN tenants t ON t.id = m.tenant_id
+		WHERE t.slug = 'tenant-b' AND m.user_id = $1`, w.adminBID)
+	r = w.do(t, http.MethodPost, "/v1/admin/users/invite", w.tokenA,
+		map[string]any{"email": "admin-b@example.com", "role_ids": []string{}})
+	if r.Status != http.StatusAccepted {
+		t.Errorf("invite B's admin from A = %d %s, want 202", r.Status, r.Raw)
+	}
+	after := w.text(t, `SELECT m.status FROM tenant_members m JOIN tenants t ON t.id = m.tenant_id
+		WHERE t.slug = 'tenant-b' AND m.user_id = $1`, w.adminBID)
+	if before != after {
+		t.Errorf("B's membership changed from %s to %s", before, after)
+	}
+
+	// A role A creates is invisible to B.
+	created := w.do(t, http.MethodPost, "/v1/admin/roles", w.tokenA,
+		map[string]any{"name": "only-in-a", "permissions": []string{}})
+	if created.Status != http.StatusCreated {
+		t.Fatalf("create role in A = %d %s", created.Status, created.Raw)
+	}
+	for _, it := range items(w.do(t, http.MethodGet, "/v1/admin/roles", w.tokenB, nil).Data) {
+		if it["name"] == "only-in-a" {
+			t.Error("a role created in A is listed in B")
+		}
+	}
+
+	// /me shows only the caller: A's admin has no session or tenant of B's.
+	sessions := w.callList(t, "/v1/me/sessions", w.tokenA)
+	for _, s := range sessions.Data {
+		if s["id"] == w.familyB {
+			t.Error("A's session list contains B's session")
+		}
+	}
+	tenants := w.callList(t, "/v1/me/tenants", w.tokenA)
+	for _, tn := range tenants.Data {
+		if tn["slug"] == "tenant-b" {
+			t.Error("A's tenant list contains tenant B")
+		}
+	}
+}
+
 // TestAdminAndMeRoutesAreCovered collects every /v1/admin and /v1/me route
 // from the router and fails if one is not declared here, so a new admin route
 // cannot ship without an isolation decision.
@@ -219,14 +288,18 @@ var declaredRoutes = map[string]bool{
 	"DELETE /v1/admin/roles/{id}":               true,
 	"PUT /v1/admin/roles/{id}/permissions":      true,
 	"DELETE /v1/me/sessions/{id}":               true,
-	// Tenant-scoped lists and catalog — TestListRoutesAreTenantScoped.
+	// Tenant-scoped lists — TestListRoutesAreTenantScoped.
+	// POST roles and invite take no ID — TestCrossTenantWritesStayInTheCallersTenant.
+	// GET permissions is the global catalog, not tenant data.
 	"GET /v1/admin/users":         true,
 	"GET /v1/admin/roles":         true,
 	"GET /v1/admin/audit":         true,
 	"GET /v1/admin/permissions":   true,
 	"POST /v1/admin/roles":        true,
 	"POST /v1/admin/users/invite": true,
-	// Caller-only me routes.
+	// Caller-only me routes: sessions and tenants are checked in
+	// TestCrossTenantWritesStayInTheCallersTenant; the rest act on the token's
+	// own user and take no ID.
 	"GET /v1/me/":                     true,
 	"PATCH /v1/me/":                   true,
 	"POST /v1/me/password":            true,
@@ -357,4 +430,11 @@ func diff(a, b map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// callList is do for routes whose data is a JSON array.
+func (w *world) callList(t *testing.T, path, token string) testkit.Response[[]map[string]any] {
+	t.Helper()
+	return testkit.Do[[]map[string]any](t, w.srv, http.MethodGet, path, nil,
+		http.Header{"Authorization": {"Bearer " + token}})
 }
