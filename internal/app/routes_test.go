@@ -23,7 +23,7 @@ func (groupsModule) Register(rt *httpx.Routes) {
 }
 
 func TestRouteGroups(t *testing.T) {
-	r := (&App{}).routes([]Module{groupsModule{}}, nil)
+	r := (&App{}).routes(chi.NewRouter(), []Module{groupsModule{}}, nil)
 	var got []string
 	if err := chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		got = append(got, method+" "+route)
@@ -46,7 +46,7 @@ func TestRouteGroups(t *testing.T) {
 }
 
 func TestUnknownRoutesUseErrorEnvelope(t *testing.T) {
-	srv := testkit.Server(t, (&App{}).routes([]Module{groupsModule{}}, nil))
+	srv := testkit.Server(t, (&App{}).routes(chi.NewRouter(), []Module{groupsModule{}}, nil))
 	tests := []struct {
 		method, path string
 		status       int
@@ -68,7 +68,7 @@ func TestUnknownRoutesUseErrorEnvelope(t *testing.T) {
 
 func TestSwaggerNeedsBasicAuth(t *testing.T) {
 	a := &App{cfg: Config{Swagger: SwaggerConfig{Enabled: true, Username: "u", Password: "p"}}}
-	srv := testkit.Server(t, a.routes(nil, nil))
+	srv := testkit.Server(t, a.routes(chi.NewRouter(), nil, nil))
 	for _, tc := range []struct {
 		name, user, pass string
 		status           int
