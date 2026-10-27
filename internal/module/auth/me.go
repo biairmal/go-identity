@@ -342,7 +342,8 @@ func (m *Module) updateMe(r *http.Request) (any, error) {
 //	@Security    BearerAuth
 //	@Success     200 {object} response.BaseResponse[auth.TokenResponse]
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
-//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     401 {object} response.BaseResponse[any] "Missing/invalid/expired token, or wrong current_password"
+//	@Failure     404 {object} response.BaseResponse[any] "PROVIDER_DISABLED"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/me/password [post]
 func (m *Module) changePassword(r *http.Request) (any, error) {

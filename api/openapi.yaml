@@ -2,8 +2,10 @@ openapi: 3.1.0
 
 # The machine-readable form of TRD section 9. The TRD is the source of truth:
 # when the two disagree, fix whichever is wrong against the TRD and record why
-# in docs/DECISIONS.md. Contract tests (T7.3) keep them in line once the
-# handlers exist.
+# in docs/DECISIONS.md. The finished handlers are the reference for everything
+# else here (T7.3): no frontend consumes this file yet, so it is reconciled by
+# inspection rather than by an automated contract-test suite. Paths marked
+# NOT YET IMPLEMENTED are drafts for work that has not started.
 #
 # Run a mock server from this file:
 #   npx @stoplight/prism-cli mock api/openapi.yaml
@@ -194,8 +196,10 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/google/start:
     get:
       tags: [auth]
@@ -218,6 +222,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/google/callback:
     get:
       tags: [auth]
@@ -240,6 +245,7 @@ paths:
       responses:
         "302": { description: Redirect to the frontend with a code or an error }
 
+  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/google/link/start:
     get:
       tags: [me]
@@ -256,6 +262,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/exchange:
     post:
       tags: [auth]
@@ -360,6 +367,7 @@ paths:
                 tenant_id: { type: string, format: uuid }
       responses:
         "200": { $ref: "#/components/responses/TokenResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -479,6 +487,8 @@ paths:
                     properties:
                       data: { $ref: "#/components/schemas/InvitePreview" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /v1/auth/invite/accept:
     post:
@@ -537,6 +547,7 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: "#/components/schemas/ServiceToken" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /v1/me:
@@ -807,6 +818,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /v1/admin/users/{id}/roles:
     put:
@@ -958,6 +970,7 @@ paths:
                               items:
                                 type: array
                                 items: { $ref: "#/components/schemas/RoleSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
     post:
@@ -1192,6 +1205,7 @@ paths:
                               items:
                                 type: array
                                 items: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
