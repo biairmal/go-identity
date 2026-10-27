@@ -140,9 +140,10 @@ func (s *Invites) invite(
 	if err != nil {
 		return err
 	}
-	if err := mail.Queue(ctx, s.outbox, templates.InviteMessage(a.Email, issued.Raw, map[string]string{
+	msg := templates.InviteMessage(a.Email, issued.Raw, issued.Token.ExpiresAt, map[string]string{
 		"InviterName": inviter.DisplayName, "TenantName": tenant.Name,
-	})); err != nil {
+	})
+	if err := mail.Queue(ctx, s.outbox, msg); err != nil {
 		return err
 	}
 	return s.audit.Write(ctx, &AuditEvent{

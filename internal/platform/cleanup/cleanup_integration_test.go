@@ -125,6 +125,38 @@ func TestRunOnceRespectsTheBatchSize(t *testing.T) {
 	}
 }
 
+// TestRunOnceDropsOutboxRowsPastTheirExpiry checks an unsent row goes as soon
+// as its payload's expires_at passes, while a row without one, or with one
+// that does not parse, keeps the retention window.
+func TestRunOnceDropsOutboxRowsPastTheirExpiry(t *testing.T) {
+	db := testkit.Postgres(t)
+	ctx := context.Background()
+	job := New(db, testkit.NewClock(now), nil)
+
+	created := now.Add(-time.Hour)
+	for label, payload := range map[string]string{
+		"expired":   `{"expires_at": "` + now.Add(-time.Minute).Format(time.RFC3339Nano) + `"}`,
+		"live":      `{"expires_at": "` + now.Add(time.Minute).Format(time.RFC3339Nano) + `"}`,
+		"no-expiry": `{}`,
+		"malformed": `{"expires_at": "soon"}`,
+	} {
+		if _, err := db.Leader().ExecContext(ctx,
+			`INSERT INTO outbox (topic, key, payload, created_at) VALUES ('mail.send', $1, $2, $3)`,
+			label, payload, created); err != nil {
+			t.Fatalf("insert outbox %s: %v", label, err)
+		}
+	}
+
+	deleted, err := job.RunOnce(ctx)
+	if err != nil {
+		t.Fatalf("RunOnce() = %v", err)
+	}
+	if deleted["outbox_unsendable"] != 1 {
+		t.Errorf("deleted[outbox_unsendable] = %d, want 1", deleted["outbox_unsendable"])
+	}
+	assertKeys(ctx, t, db, `SELECT key FROM outbox`, []string{"live", "no-expiry", "malformed"})
+}
+
 // ptr returns a pointer to t, for the nullable timestamp columns.
 func ptr(t time.Time) *time.Time { return &t }
 

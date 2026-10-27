@@ -190,7 +190,7 @@ func (s *Registrations) queueVerification(ctx context.Context, userID uuid.UUID,
 	if err != nil {
 		return err
 	}
-	return mail.Queue(ctx, s.outbox, templates.VerifyEmailMessage(email, issued.Raw,
+	return mail.Queue(ctx, s.outbox, templates.VerifyEmailMessage(email, issued.Raw, issued.Token.ExpiresAt,
 		map[string]string{"DisplayName": name}))
 }
 

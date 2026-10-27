@@ -74,7 +74,7 @@ func (s *PasswordResets) Forgot(ctx context.Context, email string) error {
 		if err != nil {
 			return err
 		}
-		return mail.Queue(ctx, s.outbox, templates.ResetPasswordMessage(a.Email, issued.Raw,
+		return mail.Queue(ctx, s.outbox, templates.ResetPasswordMessage(a.Email, issued.Raw, issued.Token.ExpiresAt,
 			map[string]string{"DisplayName": a.DisplayName}))
 	})
 }

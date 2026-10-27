@@ -3,9 +3,11 @@ package database_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
@@ -154,6 +156,54 @@ func TestDispatcherRecordsFailures(t *testing.T) {
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("sender called %d times, want 1", calls.Load())
+	}
+}
+
+// TestDispatcherNeverSendsAnExpiredRow checks a row past its payload's
+// expires_at is recorded as expired without reaching its Sender and is never
+// claimed again, while rows without a usable expires_at are sent as before.
+func TestDispatcherNeverSendsAnExpiredRow(t *testing.T) {
+	db := testkit.Postgres(t)
+	ctx := context.Background()
+	ob := database.NewOutbox(db)
+	for _, p := range []map[string]any{
+		{"name": "expired", "expires_at": time.Now().Add(-time.Hour)},
+		{"name": "live", "expires_at": time.Now().Add(time.Hour)},
+		{"name": "no-expiry"},
+		{"name": "malformed", "expires_at": "soon"},
+	} {
+		if err := ob.Enqueue(ctx, "t", p["name"].(string), p); err != nil {
+			t.Fatalf("Enqueue: %v", err)
+		}
+	}
+
+	var sent []string
+	sender := database.SenderFunc(func(_ context.Context, m database.Message) error {
+		sent = append(sent, m.Key)
+		return nil
+	})
+	d := database.NewDispatcher(db, map[string]database.Sender{"t": sender}, nil)
+	if n, err := d.DispatchOnce(ctx); err != nil || n != 4 {
+		t.Fatalf("DispatchOnce = %d, %v; want 4 claimed", n, err)
+	}
+	if want := []string{"live", "no-expiry", "malformed"}; !slices.Equal(sent, want) {
+		t.Fatalf("sender got %v, want %v", sent, want)
+	}
+	if n := countOutbox(t, db, "key = 'expired' AND sent_at IS NULL AND attempts = 1 AND last_error = '"+
+		database.ExpiredReason+"'"); n != 1 {
+		t.Fatal("the expired row was not recorded as expired")
+	}
+
+	// Long past any backoff, the expired row is still never claimed.
+	if _, err := db.Leader().ExecContext(ctx,
+		`UPDATE outbox SET created_at = now() - interval '1 day' WHERE key = 'expired'`); err != nil {
+		t.Fatalf("age the expired row: %v", err)
+	}
+	if n, err := d.DispatchOnce(ctx); err != nil || n != 0 {
+		t.Fatalf("DispatchOnce after backoff = %d, %v; want 0 claimed", n, err)
+	}
+	if len(sent) != 3 {
+		t.Fatalf("sender called %d times, want 3", len(sent))
 	}
 }
 

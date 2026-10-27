@@ -6,6 +6,7 @@ package templates
 import (
 	"bytes"
 	"text/template"
+	"time"
 
 	"github.com/biairmal/go-sdk/lib/errorz"
 
@@ -40,36 +41,37 @@ var subjects = map[string]string{
 func Subject(name string) string { return subjects[name] }
 
 // VerifyEmailMessage builds the mail that confirms a new registration.
-func VerifyEmailMessage(to, token string, data map[string]string) *mail.Message {
-	return message(VerifyEmail, PathVerifyEmail, to, token, data)
+func VerifyEmailMessage(to, token string, expiresAt time.Time, data map[string]string) *mail.Message {
+	return message(VerifyEmail, PathVerifyEmail, to, token, expiresAt, data)
 }
 
 // ResetPasswordMessage builds the mail behind forgot-password.
-func ResetPasswordMessage(to, token string, data map[string]string) *mail.Message {
-	return message(ResetPassword, PathResetPassword, to, token, data)
+func ResetPasswordMessage(to, token string, expiresAt time.Time, data map[string]string) *mail.Message {
+	return message(ResetPassword, PathResetPassword, to, token, expiresAt, data)
 }
 
 // InviteMessage builds the mail that invites someone into a tenant.
-func InviteMessage(to, token string, data map[string]string) *mail.Message {
-	return message(Invite, PathInvite, to, token, data)
+func InviteMessage(to, token string, expiresAt time.Time, data map[string]string) *mail.Message {
+	return message(Invite, PathInvite, to, token, expiresAt, data)
 }
 
 // ExistingAccountMessage builds the mail sent instead of a registration when
 // the address already has an account, so the response cannot reveal which
 // addresses exist. It carries no token, only a link to sign in.
 func ExistingAccountMessage(to string, data map[string]string) *mail.Message {
-	return message(ExistingAccount, PathSignIn, to, "", data)
+	return message(ExistingAccount, PathSignIn, to, "", time.Time{}, data)
 }
 
-// message assembles one message.
-func message(name, path, to, token string, data map[string]string) *mail.Message {
+// message assembles one message. expiresAt is the token's expiry.
+func message(name, path, to, token string, expiresAt time.Time, data map[string]string) *mail.Message {
 	return &mail.Message{
-		To:       to,
-		Subject:  Subject(name),
-		Template: name,
-		LinkPath: path,
-		Token:    token,
-		Data:     data,
+		To:        to,
+		Subject:   Subject(name),
+		Template:  name,
+		LinkPath:  path,
+		Token:     token,
+		ExpiresAt: expiresAt,
+		Data:      data,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Topic is the outbox topic mail is queued under. The worker routes it to the
@@ -35,6 +36,10 @@ type Message struct {
 	// dispatcher clears it once the mail is sent, and it is never stored
 	// anywhere else in the clear.
 	Token string `json:"token,omitempty"`
+	// ExpiresAt is when Token stops working. Past it the dispatcher never
+	// sends the mail and the cleanup job deletes it. Zero for mail without
+	// a token, which then keeps the outbox's usual retry window.
+	ExpiresAt time.Time `json:"expires_at,omitzero"`
 	// Data holds the remaining template variables.
 	Data map[string]string `json:"data,omitempty"`
 }

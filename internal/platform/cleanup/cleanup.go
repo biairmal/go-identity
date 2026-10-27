@@ -104,14 +104,16 @@ func (j *Job) tasks() []task {
 		},
 		{
 			name: "outbox_unsendable",
-			// A mail row whose one-time token has expired can never be
-			// useful: the link in it would be rejected. Dropping it
-			// stops the dispatcher retrying forever.
+			// A row past its payload's expires_at (a mail whose one-time
+			// link would be rejected) goes at once; any other unsent row
+			// after the retention window, so the dispatcher stops
+			// retrying it.
 			sql: `DELETE FROM outbox WHERE id IN (
 			          SELECT id FROM outbox
-			          WHERE sent_at IS NULL AND created_at < $2
+			          WHERE sent_at IS NULL
+			            AND (created_at < $2 OR ` + database.PayloadExpiresAt + ` < $3)
 			          ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED)`,
-			args: func(now time.Time) []any { return []any{now.Add(-retention)} },
+			args: func(now time.Time) []any { return []any{now.Add(-retention), now} },
 		},
 	}
 }

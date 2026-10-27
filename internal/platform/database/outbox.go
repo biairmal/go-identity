@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,6 +21,21 @@ const (
 	maxErrorLen        = 1000
 )
 
+// Expiry of a message. A payload may carry a top-level "expires_at" (RFC 3339)
+// after which the message is worth nothing, like a mail whose one-time link
+// has expired.
+const (
+	// ExpiredReason is the last_error of a row whose expires_at passed before
+	// it was sent. Such a row is never handed to a Sender and never claimed
+	// again; the cleanup job deletes it.
+	ExpiredReason = "expired"
+	// PayloadExpiresAt is the SQL for a row's expires_at: NULL when the
+	// payload has none, or one that does not parse, so a malformed value
+	// cannot fail the query that claims or cleans every other row.
+	PayloadExpiresAt = `CASE WHEN pg_input_is_valid(payload->>'expires_at', 'timestamptz')
+		THEN (payload->>'expires_at')::timestamptz END`
+)
+
 // Message is one outbox row handed to a Sender.
 type Message struct {
 	ID       int64
@@ -27,6 +43,12 @@ type Message struct {
 	Key      string
 	Payload  json.RawMessage
 	Attempts int
+}
+
+// claimedRow is a claimed Message and whether its expires_at has passed.
+type claimedRow struct {
+	Message
+	expired bool
 }
 
 // Sender delivers messages of one topic (an email, a queue publish). It must
@@ -124,24 +146,26 @@ func (d *Dispatcher) DispatchOnce(ctx context.Context) (int, error) {
 	return claimed, err
 }
 
-// claim locks up to one batch of unsent rows whose backoff has elapsed.
-func (d *Dispatcher) claim(ctx context.Context) ([]Message, error) {
+// claim locks up to one batch of unsent rows whose backoff has elapsed,
+// skipping rows already dropped as expired.
+func (d *Dispatcher) claim(ctx context.Context) ([]claimedRow, error) {
 	rows, err := Leader(ctx, d.db).QueryContext(ctx, `
-		SELECT id, topic, key, payload, attempts
+		SELECT id, topic, key, payload, attempts, coalesce(`+PayloadExpiresAt+` <= now(), false)
 		FROM outbox
 		WHERE sent_at IS NULL
+		  AND last_error <> $3
 		  AND created_at + make_interval(secs => power(2, least(attempts, $2)) - 1) <= now()
 		ORDER BY id
 		LIMIT $1
-		FOR UPDATE SKIP LOCKED`, d.batch, maxBackoffExponent)
+		FOR UPDATE SKIP LOCKED`, d.batch, maxBackoffExponent, ExpiredReason)
 	if err != nil {
 		return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("outbox: claim")
 	}
 	defer func() { _ = rows.Close() }()
-	var msgs []Message
+	var msgs []claimedRow
 	for rows.Next() {
-		var m Message
-		if err := rows.Scan(&m.ID, &m.Topic, &m.Key, &m.Payload, &m.Attempts); err != nil {
+		var m claimedRow
+		if err := rows.Scan(&m.ID, &m.Topic, &m.Key, &m.Payload, &m.Attempts, &m.expired); err != nil {
 			return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("outbox: scan")
 		}
 		msgs = append(msgs, m)
@@ -153,7 +177,7 @@ func (d *Dispatcher) claim(ctx context.Context) ([]Message, error) {
 }
 
 // deliver sends one message and records success or the failure.
-func (d *Dispatcher) deliver(ctx context.Context, m *Message) error {
+func (d *Dispatcher) deliver(ctx context.Context, m *claimedRow) error {
 	sendErr := d.send(ctx, m)
 	conn := Leader(ctx, d.db)
 	var err error
@@ -171,13 +195,17 @@ func (d *Dispatcher) deliver(ctx context.Context, m *Message) error {
 	return nil
 }
 
-// send routes m to its topic's Sender.
-func (d *Dispatcher) send(ctx context.Context, m *Message) error {
+// send routes m to its topic's Sender. An expired message fails with
+// ExpiredReason without reaching the Sender, which also stops its retries.
+func (d *Dispatcher) send(ctx context.Context, m *claimedRow) error {
+	if m.expired {
+		return errors.New(ExpiredReason)
+	}
 	s, ok := d.senders[m.Topic]
 	if !ok {
 		return fmt.Errorf("no sender for topic %q", m.Topic)
 	}
-	return s.Send(ctx, *m)
+	return s.Send(ctx, m.Message)
 }
 
 // truncate keeps last_error short.
