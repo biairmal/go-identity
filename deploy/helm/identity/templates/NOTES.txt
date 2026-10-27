@@ -1,0 +1,16 @@
+go-identity ({{ .Values.image.tag | default .Chart.AppVersion }}) is installed as {{ include "identity.fullname" . }}.
+
+Check rollout:
+  kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+{{- if not .Values.signingKeys.existingSecret }}
+
+No signingKeys.existingSecret is set: the api and worker pods will fail to
+start without signing keys mounted at {{ .Values.config.SIGNING_KEYS_DIR }}.
+See docs/runbooks/key-rotation.md for how to create that Secret.
+{{- end }}
+{{- if not .Values.secret.existingSecret }}
+
+No secret.existingSecret is set: DB_PASSWORD and the other secret env vars
+are missing. Create a Secret and set secret.existingSecret to its name.
+{{- end }}

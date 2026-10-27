@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "identity.fullname" . }}
+  labels:
+    {{- include "identity.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "identity.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "identity.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      securityContext:
+        {{- include "identity.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: {{ include "identity.terminationGracePeriodSeconds" . }}
+      containers:
+        - name: api
+          image: {{ include "identity.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            {{- include "identity.envFrom" . | nindent 12 }}
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+          lifecycle:
+            preStop:
+              # Native sleep action (K8s 1.29+): the distroless image has no
+              # shell for `sleep N` via exec.
+              sleep:
+                seconds: {{ .Values.lifecycle.drainDelay | trimSuffix "s" | int }}
+          securityContext:
+            {{- include "identity.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if .Values.signingKeys.existingSecret }}
+            - { name: signing-keys, mountPath: /etc/identity/keys, readOnly: true }
+            {{- end }}
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        {{- if .Values.signingKeys.existingSecret }}
+        - name: signing-keys
+          secret:
+            secretName: {{ .Values.signingKeys.existingSecret }}
+        {{- end }}

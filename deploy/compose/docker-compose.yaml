@@ -1,5 +1,9 @@
-# Local development stack: Postgres only. On first start it runs
-# deploy/sql/bootstrap.sql, which creates the identity schema and role.
+# Local development (`make up`/`make down`): just Postgres, by default.
+#
+# VPS deploy: `docker compose --profile vps pull && docker compose --profile
+# vps up -d`. `migrate` runs first each time; `api` and `worker` wait on it.
+# Caddy terminates TLS. Needs IMAGE_TAG (and IMAGE if not GHCR) and a real
+# .env next to this file (see .env.example at the repo root).
 name: go-identity
 
 services:
@@ -22,5 +26,57 @@ services:
       timeout: 3s
       retries: 30
 
+  migrate:
+    profiles: [vps]
+    image: ${IMAGE:-ghcr.io/biairmal/go-identity}:${IMAGE_TAG:-latest}
+    command: ["migrate", "up"]
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: [vps]
+    image: ${IMAGE:-ghcr.io/biairmal/go-identity}:${IMAGE_TAG:-latest}
+    command: ["serve"]
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+    volumes:
+      - ./keys:/etc/identity/keys:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    profiles: [vps]
+    image: ${IMAGE:-ghcr.io/biairmal/go-identity}:${IMAGE_TAG:-latest}
+    command: ["worker"]
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+    volumes:
+      - ./keys:/etc/identity/keys:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    profiles: [vps]
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - api
+
 volumes:
   pgdata:
+  caddy_data:

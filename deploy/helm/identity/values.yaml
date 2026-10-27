@@ -1,0 +1,97 @@
+image:
+  repository: ghcr.io/biairmal/go-identity
+  tag: ""  # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+worker:
+  enabled: true
+  replicaCount: 1
+
+resources: {}
+workerResources: {}
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Toggled on for a cluster that needs it; kind picks the resource (plain
+# Ingress or an OpenShift Route). Off by default so `helm install` on a bare
+# kind cluster needs no ingress controller.
+route:
+  enabled: false
+  kind: ingress  # ingress | openshift
+  host: ""
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+
+# Must track config/config.yaml's lifecycle block: terminationGracePeriod is
+# computed from these three (plus a margin) so the pod is never killed before
+# a draining request finishes.
+lifecycle:
+  drainDelay: 5s
+  shutdownTimeout: 20s
+  closerTimeout: 10s
+
+# Non-secret env vars, by the name config/config.yaml reads (its ${VAR:default}
+# keys). Rendered into a ConfigMap and loaded with envFrom.
+config:
+  SERVICE_NAME: go-identity
+  APP_ENV: production
+  LOG_LEVEL: info
+  LOG_FORMAT: json
+  CORS_ORIGINS: ""
+  DB_HOST: ""
+  DB_PORT: "5432"
+  DB_NAME: app
+  DB_USER: identity
+  DB_SSLMODE: require
+  AUTH_ENABLED: "true"
+  AUTH_ISSUER: identity
+  AUTH_AUDIENCE: api
+  METRICS_ENABLED: "true"
+  METRICS_NAMESPACE: identity
+  TRACING_ENABLED: "false"
+  SWAGGER_ENABLED: "false"
+  IDENTITY_PUBLIC_URL: ""
+  FRONTEND_URL: ""
+  REGISTRATION_ENABLED: "true"
+  TOKEN_ISSUER: identity
+  TOKEN_AUDIENCE: api
+  SIGNING_KEYS_DIR: /etc/identity/keys
+  TENANCY_MODE: single
+  TRUST_PROXY: "true"
+  REDIS_ADDR: ""
+
+# Name of a Secret this chart does not create (DB_PASSWORD,
+# SUPER_ADMIN_EMAIL/PASSWORD, EMAIL_ENCRYPTION_KEY, EMAIL_BLIND_INDEX_KEY,
+# SWAGGER_USERNAME/PASSWORD, GOOGLE_CLIENT_SECRET, ... per .env.example).
+# Loaded with envFrom alongside the ConfigMap.
+secret:
+  existingSecret: ""
+
+# Name of a Secret this chart does not create, with the signing keys: one PEM
+# per kid plus keys.yaml (TRD 6), mounted read-only at config.SIGNING_KEYS_DIR.
+signingKeys:
+  existingSecret: ""
+
+migrate:
+  backoffLimit: 3

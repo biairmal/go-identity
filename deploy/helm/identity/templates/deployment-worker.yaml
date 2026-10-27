@@ -1,0 +1,47 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "identity.fullname" . }}-worker
+  labels:
+    {{- include "identity.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "identity.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "identity.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      securityContext:
+        {{- include "identity.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: {{ include "identity.terminationGracePeriodSeconds" . }}
+      containers:
+        - name: worker
+          image: {{ include "identity.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["worker"]
+          envFrom:
+            {{- include "identity.envFrom" . | nindent 12 }}
+          securityContext:
+            {{- include "identity.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.workerResources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if .Values.signingKeys.existingSecret }}
+            - { name: signing-keys, mountPath: /etc/identity/keys, readOnly: true }
+            {{- end }}
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        {{- if .Values.signingKeys.existingSecret }}
+        - name: signing-keys
+          secret:
+            secretName: {{ .Values.signingKeys.existingSecret }}
+        {{- end }}
+{{- end }}
