@@ -5,10 +5,12 @@ COVERAGE_OUT := out/coverage.out
 SWAG := go run github.com/swaggo/swag/cmd/swag@v1.16.6
 SWAGGER_DIR := api/swagger
 BIN := bin/server
+IMAGE := ghcr.io/biairmal/go-identity
+GIT_SHA := $(shell git rev-parse --short HEAD)
 
 .DEFAULT_GOAL := help
 .PHONY: help up down run build swagger test test-integration lint format format-check coverage vulncheck check \
-	migrate-up migrate-down migrate-create keys openapi-lint openapi-mock
+	migrate-up migrate-down migrate-create keys openapi-lint openapi-mock image
 
 help: ## Show targets
 	@grep -E "^[a-z-]+:.*## " Makefile | sed -e "s/:.*## /\t/"
@@ -59,6 +61,9 @@ openapi-lint: ## Validate api/openapi.yaml (needs npx)
 
 openapi-mock: ## Serve api/openapi.yaml as a mock on :4010 (needs npx)
 	npx --yes @stoplight/prism-cli@latest mock api/openapi.yaml -p 4010
+
+image: ## Build the Docker image tagged with the git SHA
+	docker build --build-arg SERVICE_VERSION=$(GIT_SHA) -t $(IMAGE):$(GIT_SHA) .
 
 check: format-check lint test coverage vulncheck ## CI gate: format, lint, unit tests, coverage, vulncheck
 
