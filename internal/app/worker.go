@@ -19,12 +19,12 @@ import (
 // senders maps outbox topics to their Sender. Modules that enqueue a topic
 // add its sender here.
 //
-// Until a real mailer lands, mail is delivered by the development logging
-// mailer, which refuses to be built in production: a worker there would print
-// one-time tokens to its logs instead of emailing them, so it must fail
-// loudly rather than start.
+// Mail goes out over SMTP when the mail block is set (newMailer). Without it
+// the development logging mailer refuses to be built in production: a worker
+// there would print one-time tokens to its logs instead of emailing them, so
+// it must fail loudly rather than start.
 func senders(cfg *Config, log logger.Logger, db *sqlkit.DB) (map[string]database.Sender, error) {
-	mailer, err := mail.NewLogging(log, cfg.Service.Environment, cfg.Modules.Auth.EmailBaseURL())
+	mailer, err := newMailer(cfg, log)
 	if err != nil {
 		return nil, err
 	}

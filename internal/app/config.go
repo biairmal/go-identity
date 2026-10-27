@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	netmail "net/mail"
 	"time"
 
 	"github.com/biairmal/go-sdk/lib/auth"
@@ -9,6 +10,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/lifecycle"
 	"github.com/biairmal/go-sdk/lib/logger"
+	"github.com/biairmal/go-sdk/lib/mailer"
 	"github.com/biairmal/go-sdk/lib/metrics"
 	"github.com/biairmal/go-sdk/lib/redis"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
@@ -37,6 +39,7 @@ type Config struct {
 	Log       logger.Options   `mapstructure:"log"`
 	Database  sqlkit.Config    `mapstructure:"database"`
 	Redis     RedisConfig      `mapstructure:"redis"`
+	Mail      MailConfig       `mapstructure:"mail"`
 	Auth      AuthConfig       `mapstructure:"auth"`
 	Crypto    CryptoConfig     `mapstructure:"crypto"`
 	Tracing   TracingConfig    `mapstructure:"tracing"`
@@ -66,6 +69,31 @@ type RedisConfig struct {
 
 // Enabled reports whether an address is configured.
 func (r *RedisConfig) Enabled() bool { return r.Address != "" }
+
+// MailConfig is the SMTP server the worker delivers mail through; the rest is
+// go-sdk mailer.SMTPConfig. Without a host the worker uses the development
+// logging mailer, which refuses to start in production.
+type MailConfig struct {
+	// From is the sender address, e.g. "Identity <no-reply@example.com>".
+	From              string `mapstructure:"from"`
+	mailer.SMTPConfig `mapstructure:",squash"`
+}
+
+// Enabled reports whether an SMTP host is configured.
+func (m *MailConfig) Enabled() bool { return m.Host != "" }
+
+// validate only checks a configured server: the sender must parse and the
+// SMTP settings must build a transport (which fills go-sdk's defaults).
+func (m *MailConfig) validate() error {
+	if !m.Enabled() {
+		return nil
+	}
+	if _, err := netmail.ParseAddress(m.From); err != nil {
+		return errorz.BadRequest().WithMessage("from must be an email address when host is set")
+	}
+	_, err := mailer.NewSMTPTransport(&m.SMTPConfig)
+	return err
+}
 
 // ServiceConfig identifies the running service.
 type ServiceConfig struct {
@@ -133,6 +161,7 @@ func (c *Config) sections() []section {
 		{"http", c.HTTP.validate},
 		{"database", c.Database.Validate},
 		{"redis", c.validateRedis},
+		{"mail", c.Mail.validate},
 		{"auth", c.validateAuth},
 		{"crypto", c.validateCrypto},
 		{"tracing", c.validateTracing},

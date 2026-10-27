@@ -101,6 +101,15 @@ redis:                                        # optional; sign-in and sign-up ra
   address: ${REDIS_ADDR:}                     # empty = no Redis, per-pod in-memory limits
   password: ${REDIS_PASSWORD:}
 
+mail:                                         # SMTP for the worker's mail (go-sdk mailer)
+  host: ${SMTP_HOST:}                         # empty = logging stub, which the worker refuses in production
+  port: ${SMTP_PORT:587}
+  username: ${SMTP_USERNAME:}                 # empty = no AUTH
+  password: ${SMTP_PASSWORD:}
+  tls: ${SMTP_TLS:starttls}                   # starttls | implicit | none
+  timeout: 30s
+  from: ${MAIL_FROM:}                         # required when host is set
+
 # One block per module: a setting lives with the module that reads it. Only
 # values that differ from the module's Default() need to appear here.
 modules:

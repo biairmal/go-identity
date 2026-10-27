@@ -80,10 +80,14 @@ config:
   TENANCY_MODE: single
   TRUST_PROXY: "true"
   REDIS_ADDR: ""
+  SMTP_HOST: ""                 # required: the worker refuses production without it
+  SMTP_PORT: "587"
+  SMTP_TLS: starttls
+  MAIL_FROM: ""
 
 # Name of a Secret this chart does not create (DB_PASSWORD,
 # SUPER_ADMIN_EMAIL/PASSWORD, EMAIL_ENCRYPTION_KEY, EMAIL_BLIND_INDEX_KEY,
-# SWAGGER_USERNAME/PASSWORD, GOOGLE_CLIENT_SECRET, ... per .env.example).
+# SWAGGER_USERNAME/PASSWORD, GOOGLE_CLIENT_SECRET, SMTP_USERNAME/PASSWORD, ... per .env.example).
 # Loaded with envFrom alongside the ConfigMap.
 secret:
   existingSecret: ""
