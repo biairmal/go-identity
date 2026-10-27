@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	sdkauth "github.com/biairmal/go-sdk/lib/auth"
 	"github.com/biairmal/go-sdk/lib/authz"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/biairmal/go-identity/internal/module/auth/keys"
 	"github.com/biairmal/go-identity/internal/module/auth/onetime"
+	"github.com/biairmal/go-identity/internal/module/auth/provider/google"
 	"github.com/biairmal/go-identity/internal/module/auth/token"
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/database"
@@ -46,6 +48,8 @@ type Module struct {
 	switches *Switches
 	// serviceTokens runs POST /v1/auth/token for resource services.
 	serviceTokens *ServiceTokens
+	// google runs Google sign-in, linking and the code exchange.
+	google *GoogleSignIns
 	// az guards the admin invite route.
 	az authz.Authorizer
 	// limiter rate-limits the public sign-in and sign-up routes; nil
@@ -84,6 +88,9 @@ type Deps struct {
 	// Authz guards POST /v1/admin/users/invite. It may be nil when the
 	// routes are not registered.
 	Authz authz.Authorizer
+	// EmailCipher encrypts the address stored with a linked identity; nil
+	// stores none.
+	EmailCipher EmailEncrypter
 }
 
 // New loads the signing keys and builds the token builder. It fails when the
@@ -163,6 +170,17 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		sessions: deps.Sessions, audit: deps.Audit, issue: issue, log: log,
 	}
 	m.serviceTokens = &ServiceTokens{cfg: &m.cfg, v: v, tokens: builder}
+	m.google = &GoogleSignIns{
+		cfg: &m.cfg, tenancy: deps.Tenancy, provider: google.New(google.Config{
+			IssuerURL: cfg.Providers.Google.IssuerURL, ClientID: cfg.Providers.Google.ClientID,
+			ClientSecret: cfg.Providers.Google.ClientSecret,
+			RedirectURL:  strings.TrimSuffix(cfg.PublicURL, "/") + "/v1" + googleCallbackPath,
+		}),
+		states:     NewStateRepository(deps.DB),
+		identities: NewIdentityRepository(deps.DB), tx: tx, users: deps.Users, tenants: deps.Tenants,
+		roles: deps.Roles, audit: deps.Audit, cipher: deps.EmailCipher, tokens: tokens, logins: m.logins,
+		clock: clk, log: log,
+	}
 	return m, nil
 }
 
@@ -204,6 +222,10 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.API.Post(forgotPasswordPath, httpx.Handle(m.forgotPassword))
 	rt.API.Post(resetPasswordPath, httpx.Handle(m.resetPassword))
 	rt.API.Post(serviceTokenPath, httpx.Handle(m.issueServiceToken))
+	rt.API.Get(googleStartPath, redirect(m.googleStart))
+	rt.API.Get(googleCallbackPath, redirect(m.googleCallback))
+	rt.API.Get(googleLinkStartPath, redirect(m.googleLinkStart))
+	rt.API.Post(exchangePath, httpx.Handle(m.exchange))
 	rt.API.Get(invitePreviewPath, httpx.Handle(m.previewInvite))
 	rt.API.Post(inviteAcceptPath, httpx.Handle(m.acceptInvite))
 	rt.Admin.With(middleware.RequirePermission(m.az, permUsersManage)).Post(adminInvitePath, httpx.Handle(m.inviteUser))

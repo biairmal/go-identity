@@ -233,6 +233,7 @@ const (
 	ActionRefreshReuse   = "auth.refresh_reuse"
 	ActionPasswordReset  = "auth.password_reset"
 	ActionPasswordChange = "auth.password_change"
+	ActionIdentityLink   = "identity.link"
 	ActionIdentityUnlink = "identity.unlink"
 )
 

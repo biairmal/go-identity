@@ -81,6 +81,8 @@ type signIn struct {
 	tenant  *TenantInfo
 	rehash  string
 	device  Device
+	// method is how the user proved who they are, for the audit row.
+	method string
 }
 
 // Login signs a user in with email and password. It returns a TokenResponse,
@@ -113,7 +115,7 @@ func (s *Logins) Login(ctx context.Context, in *LoginRequest, d Device) (any, er
 	if err != nil || choice != nil {
 		return choice, err
 	}
-	si := &signIn{account: a, tenant: tenant, device: d}
+	si := &signIn{account: a, tenant: tenant, device: d, method: "password"}
 	if needsRehash {
 		if si.rehash, err = password.Hash(in.Password); err != nil {
 			return nil, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("auth: rehash password")
@@ -314,34 +316,49 @@ func notSignable(disabled bool) error {
 func (s *Logins) complete(ctx context.Context, si *signIn) (*TokenResponse, error) {
 	var resp *TokenResponse
 	err := s.tx(ctx, func(ctx context.Context) error {
-		a := si.account
-		if si.rehash != "" {
-			if err := s.users.UpdatePasswordHash(ctx, a.ID, si.rehash); err != nil {
-				return err
-			}
-		}
-		if err := s.users.RecordSignIn(ctx, a.ID, s.clock.Now()); err != nil {
-			return err
-		}
 		var err error
-		if a.MustChangePassword {
-			resp, err = s.issue.restricted(ctx, si.account, si.tenant)
-		} else {
-			resp, err = s.sessionResponse(ctx, si)
-		}
-		if err != nil {
-			return err
-		}
-		return s.audit.Write(ctx, &AuditEvent{
-			TenantID: si.tenant.ID, ActorID: a.ID, Action: ActionLogin,
-			TargetType: TargetUser, TargetID: a.ID.String(),
-			After: map[string]any{"method": "password", "restricted": a.MustChangePassword, "rehashed": si.rehash != ""},
-		})
+		resp, err = s.record(ctx, si)
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 	s.log.InfoWithContext(ctx, "user signed in", logger.F("user_id", si.account.ID.String()))
+	return resp, nil
+}
+
+// record is complete's body, for a caller that already holds the
+// transaction.
+func (s *Logins) record(ctx context.Context, si *signIn) (*TokenResponse, error) {
+	a := si.account
+	if si.rehash != "" {
+		if err := s.users.UpdatePasswordHash(ctx, a.ID, si.rehash); err != nil {
+			return nil, err
+		}
+	}
+	if err := s.users.RecordSignIn(ctx, a.ID, s.clock.Now()); err != nil {
+		return nil, err
+	}
+	var (
+		resp *TokenResponse
+		err  error
+	)
+	if a.MustChangePassword {
+		resp, err = s.issue.restricted(ctx, si.account, si.tenant)
+	} else {
+		resp, err = s.sessionResponse(ctx, si)
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = s.audit.Write(ctx, &AuditEvent{
+		TenantID: si.tenant.ID, ActorID: a.ID, Action: ActionLogin,
+		TargetType: TargetUser, TargetID: a.ID.String(),
+		After: map[string]any{"method": si.method, "restricted": a.MustChangePassword, "rehashed": si.rehash != ""},
+	})
+	if err != nil {
+		return nil, err
+	}
 	return resp, nil
 }
 

@@ -199,7 +199,6 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
-  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/google/start:
     get:
       tags: [auth]
@@ -222,21 +221,21 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/google/callback:
     get:
       tags: [auth]
       summary: Google redirects back here
       description: |
-        Redirects to the frontend with a single-use exchange code on success,
-        or with an error reason on failure. Tokens never appear in a URL,
+        Redirects to `redirect_to` with `code` (a single-use exchange code) on
+        sign-in, `linked=1` after a link, or `error` (a `meta.reason` value) on
+        failure. A missing, expired or reused state cannot name a redirect, so
+        it answers 400 `OAUTH_STATE_INVALID` instead. Tokens never appear in a URL,
         because a URL ends up in browser history and server logs.
       operationId: googleCallback
       security: []
       parameters:
         - name: code
           in: query
-          required: true
           schema: { type: string }
         - name: state
           in: query
@@ -244,8 +243,9 @@ paths:
           schema: { type: string }
       responses:
         "302": { description: Redirect to the frontend with a code or an error }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
-  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/google/link/start:
     get:
       tags: [me]
@@ -262,7 +262,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  # NOT YET IMPLEMENTED: T4.1 (Google OIDC) has not started. Draft only.
   /v1/auth/exchange:
     post:
       tags: [auth]
@@ -282,6 +281,8 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/TokenResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/auth/refresh:
     post:
