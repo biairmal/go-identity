@@ -55,6 +55,8 @@ func (m *Module) getAuthConfig(*http.Request) (any, error) {
 //	@Param       body body auth.RegisterRequest true "Request body"
 //	@Success     202 {object} response.BaseResponse[auth.AcceptedResponse]
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     403 {object} response.BaseResponse[any] "REGISTRATION_CLOSED"
+//	@Failure     404 {object} response.BaseResponse[any] "PROVIDER_DISABLED"
 //	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/auth/register [post]
@@ -129,6 +131,7 @@ func (m *Module) resendVerification(r *http.Request) (any, error) {
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
 //	@Failure     401 {object} response.BaseResponse[any] "Invalid credentials"
 //	@Failure     403 {object} response.BaseResponse[any] "Account locked, disabled or unverified"
+//	@Failure     404 {object} response.BaseResponse[any] "PROVIDER_DISABLED"
 //	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/auth/login [post]
@@ -269,6 +272,7 @@ func (m *Module) limitEmail(r *http.Request, prefix, email string) error {
 //	@Param       body body auth.EmailRequest true "Request body"
 //	@Success     202 {object} response.BaseResponse[auth.AcceptedResponse]
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     404 {object} response.BaseResponse[any] "PROVIDER_DISABLED"
 //	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/auth/password/forgot [post]
@@ -307,6 +311,7 @@ func (m *Module) acceptEmail(
 //	@Param       body body auth.ResetPasswordRequest true "Request body"
 //	@Success     204
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid body or validation error"
+//	@Failure     404 {object} response.BaseResponse[any] "PROVIDER_DISABLED"
 //	@Failure     429 {object} response.BaseResponse[any] "Rate limited"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/auth/password/reset [post]

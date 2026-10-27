@@ -72,7 +72,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_audit_EntryPageResponse"
+                            "$ref": "#/definitions/response.BaseResponse-audit_EntryPageResponse"
                         }
                     },
                     "400": {
@@ -121,7 +121,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-array_internal_module_rbac_PermissionResponse"
+                            "$ref": "#/definitions/response.BaseResponse-array_rbac_PermissionResponse"
                         }
                     },
                     "401": {
@@ -164,7 +164,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-array_internal_module_rbac_TemplateResponse"
+                            "$ref": "#/definitions/response.BaseResponse-array_rbac_TemplateResponse"
                         }
                     },
                     "401": {
@@ -217,7 +217,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_rbac.CreateTemplateRequest"
+                            "$ref": "#/definitions/rbac.CreateTemplateRequest"
                         }
                     }
                 ],
@@ -225,7 +225,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_TemplateResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_TemplateResponse"
                         }
                     },
                     "400": {
@@ -358,7 +358,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_rbac.UpdateTemplateRequest"
+                            "$ref": "#/definitions/rbac.UpdateTemplateRequest"
                         }
                     }
                 ],
@@ -366,7 +366,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_TemplateResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_TemplateResponse"
                         }
                     },
                     "400": {
@@ -453,7 +453,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_RolePageResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_RolePageResponse"
                         }
                     },
                     "400": {
@@ -506,7 +506,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_rbac.CreateRoleRequest"
+                            "$ref": "#/definitions/rbac.CreateRoleRequest"
                         }
                     }
                 ],
@@ -514,7 +514,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_RoleResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_RoleResponse"
                         }
                     },
                     "400": {
@@ -578,7 +578,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_RoleResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_RoleResponse"
                         }
                     },
                     "401": {
@@ -709,7 +709,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_rbac.UpdateRoleRequest"
+                            "$ref": "#/definitions/rbac.UpdateRoleRequest"
                         }
                     }
                 ],
@@ -717,7 +717,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_RoleResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_RoleResponse"
                         }
                     },
                     "400": {
@@ -803,7 +803,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_rbac.SetPermissionsRequest"
+                            "$ref": "#/definitions/rbac.SetPermissionsRequest"
                         }
                     }
                 ],
@@ -811,7 +811,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_RoleResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_RoleResponse"
                         }
                     },
                     "400": {
@@ -904,7 +904,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantPageResponse"
+                            "$ref": "#/definitions/response.BaseResponse-tenant_TenantPageResponse"
                         }
                     },
                     "400": {
@@ -963,7 +963,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_tenant.CreateTenantRequest"
+                            "$ref": "#/definitions/tenant.CreateTenantRequest"
                         }
                     }
                 ],
@@ -971,7 +971,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantResponse"
+                            "$ref": "#/definitions/response.BaseResponse-tenant_TenantResponse"
                         }
                     },
                     "400": {
@@ -1041,7 +1041,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantResponse"
+                            "$ref": "#/definitions/response.BaseResponse-tenant_TenantResponse"
                         }
                     },
                     "401": {
@@ -1107,7 +1107,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_tenant.UpdateTenantRequest"
+                            "$ref": "#/definitions/tenant.UpdateTenantRequest"
                         }
                     }
                 ],
@@ -1115,7 +1115,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_TenantResponse"
+                            "$ref": "#/definitions/response.BaseResponse-tenant_TenantResponse"
                         }
                     },
                     "400": {
@@ -1226,7 +1226,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_user_AdminUserPageResponse"
+                            "$ref": "#/definitions/response.BaseResponse-user_AdminUserPageResponse"
                         }
                     },
                     "400": {
@@ -1281,7 +1281,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.InviteRequest"
+                            "$ref": "#/definitions/auth.InviteRequest"
                         }
                     }
                 ],
@@ -1289,7 +1289,7 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_InviteResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_InviteResponse"
                         }
                     },
                     "400": {
@@ -1353,7 +1353,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_user_AdminUserDetailResponse"
+                            "$ref": "#/definitions/response.BaseResponse-user_AdminUserDetailResponse"
                         }
                     },
                     "401": {
@@ -1645,7 +1645,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_rbac.SetUserRolesRequest"
+                            "$ref": "#/definitions/rbac.SetUserRolesRequest"
                         }
                     }
                 ],
@@ -1653,7 +1653,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_UserRolesResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_UserRolesResponse"
                         }
                     },
                     "400": {
@@ -1709,7 +1709,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_AuthConfigResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_AuthConfigResponse"
                         }
                     },
                     "500": {
@@ -1741,7 +1741,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.EmailRequest"
+                            "$ref": "#/definitions/auth.EmailRequest"
                         }
                     }
                 ],
@@ -1749,7 +1749,7 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_AcceptedResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_AcceptedResponse"
                         }
                     },
                     "400": {
@@ -1793,7 +1793,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.VerifyEmailRequest"
+                            "$ref": "#/definitions/auth.VerifyEmailRequest"
                         }
                     }
                 ],
@@ -1836,7 +1836,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.AcceptInviteRequest"
+                            "$ref": "#/definitions/auth.AcceptInviteRequest"
                         }
                     }
                 ],
@@ -1844,7 +1844,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_TokenResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_TokenResponse"
                         }
                     },
                     "400": {
@@ -1897,7 +1897,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_InvitePreviewResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_InvitePreviewResponse"
                         }
                     },
                     "400": {
@@ -1947,7 +1947,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.LoginRequest"
+                            "$ref": "#/definitions/auth.LoginRequest"
                         }
                     }
                 ],
@@ -1955,7 +1955,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_TokenResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_TokenResponse"
                         }
                     },
                     "400": {
@@ -1972,6 +1972,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Account locked, disabled or unverified",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -2011,7 +2017,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.RefreshRequest"
+                            "$ref": "#/definitions/auth.RefreshRequest"
                         }
                     }
                 ],
@@ -2054,7 +2060,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.RefreshRequest"
+                            "$ref": "#/definitions/auth.RefreshRequest"
                         }
                     }
                 ],
@@ -2097,7 +2103,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.EmailRequest"
+                            "$ref": "#/definitions/auth.EmailRequest"
                         }
                     }
                 ],
@@ -2105,11 +2111,17 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_AcceptedResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_AcceptedResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid body or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -2149,7 +2161,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.ResetPasswordRequest"
+                            "$ref": "#/definitions/auth.ResetPasswordRequest"
                         }
                     }
                 ],
@@ -2159,6 +2171,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid body or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -2198,7 +2216,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.RefreshRequest"
+                            "$ref": "#/definitions/auth.RefreshRequest"
                         }
                     }
                 ],
@@ -2206,7 +2224,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_TokenResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_TokenResponse"
                         }
                     },
                     "400": {
@@ -2256,7 +2274,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.RegisterRequest"
+                            "$ref": "#/definitions/auth.RegisterRequest"
                         }
                     }
                 ],
@@ -2264,11 +2282,23 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_AcceptedResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_AcceptedResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid body or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "REGISTRATION_CLOSED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -2313,7 +2343,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.SwitchTenantRequest"
+                            "$ref": "#/definitions/auth.SwitchTenantRequest"
                         }
                     }
                 ],
@@ -2321,7 +2351,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_TokenResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_TokenResponse"
                         }
                     },
                     "400": {
@@ -2377,7 +2407,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.ServiceTokenRequest"
+                            "$ref": "#/definitions/auth.ServiceTokenRequest"
                         }
                     }
                 ],
@@ -2385,7 +2415,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_ServiceTokenResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_ServiceTokenResponse"
                         }
                     },
                     "400": {
@@ -2437,7 +2467,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_rbac_InternalRoleMapResponse"
+                            "$ref": "#/definitions/response.BaseResponse-rbac_InternalRoleMapResponse"
                         }
                     },
                     "400": {
@@ -2495,7 +2525,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_tenant_InternalTenantResponse"
+                            "$ref": "#/definitions/response.BaseResponse-tenant_InternalTenantResponse"
                         }
                     },
                     "401": {
@@ -2553,7 +2583,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_user_InternalUserResponse"
+                            "$ref": "#/definitions/response.BaseResponse-user_InternalUserResponse"
                         }
                     },
                     "401": {
@@ -2602,7 +2632,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_MeResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_MeResponse"
                         }
                     },
                     "401": {
@@ -2643,7 +2673,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.UpdateMeRequest"
+                            "$ref": "#/definitions/auth.UpdateMeRequest"
                         }
                     }
                 ],
@@ -2651,7 +2681,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_MeResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_MeResponse"
                         }
                     },
                     "400": {
@@ -2740,7 +2770,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_module_auth.ChangePasswordRequest"
+                            "$ref": "#/definitions/auth.ChangePasswordRequest"
                         }
                     }
                 ],
@@ -2748,7 +2778,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-internal_module_auth_TokenResponse"
+                            "$ref": "#/definitions/response.BaseResponse-auth_TokenResponse"
                         }
                     },
                     "400": {
@@ -2758,7 +2788,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Missing, invalid or expired token",
+                        "description": "Missing/invalid/expired token, or wrong current_password",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -2791,7 +2827,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-array_internal_module_session_SessionResponse"
+                            "$ref": "#/definitions/response.BaseResponse-array_session_SessionResponse"
                         }
                     },
                     "401": {
@@ -2877,7 +2913,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.BaseResponse-array_internal_module_auth_TenantResponse"
+                            "$ref": "#/definitions/response.BaseResponse-array_auth_TenantResponse"
                         }
                     },
                     "401": {
@@ -2897,7 +2933,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_module_audit.ActorResponse": {
+        "audit.ActorResponse": {
             "type": "object",
             "properties": {
                 "display_name": {
@@ -2908,7 +2944,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_audit.EntryPageResponse": {
+        "audit.EntryPageResponse": {
             "type": "object",
             "properties": {
                 "has_next": {
@@ -2920,7 +2956,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_audit.EntryResponse"
+                        "$ref": "#/definitions/audit.EntryResponse"
                     }
                 },
                 "page": {
@@ -2937,14 +2973,14 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_audit.EntryResponse": {
+        "audit.EntryResponse": {
             "type": "object",
             "properties": {
                 "action": {
                     "type": "string"
                 },
                 "actor": {
-                    "$ref": "#/definitions/internal_module_audit.ActorResponse"
+                    "$ref": "#/definitions/audit.ActorResponse"
                 },
                 "after": {
                     "type": "object"
@@ -2972,7 +3008,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.AcceptInviteRequest": {
+        "auth.AcceptInviteRequest": {
             "type": "object",
             "required": [
                 "token"
@@ -2992,7 +3028,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.AcceptedResponse": {
+        "auth.AcceptedResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -3000,11 +3036,11 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.AuthConfigResponse": {
+        "auth.AuthConfigResponse": {
             "type": "object",
             "properties": {
                 "providers": {
-                    "$ref": "#/definitions/internal_module_auth.ProvidersResponse"
+                    "$ref": "#/definitions/auth.ProvidersResponse"
                 },
                 "registration": {
                     "type": "boolean"
@@ -3014,7 +3050,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.ChangePasswordRequest": {
+        "auth.ChangePasswordRequest": {
             "type": "object",
             "required": [
                 "new_password"
@@ -3029,7 +3065,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.EmailRequest": {
+        "auth.EmailRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3037,7 +3073,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.InvitePreviewResponse": {
+        "auth.InvitePreviewResponse": {
             "type": "object",
             "properties": {
                 "email_masked": {
@@ -3047,11 +3083,11 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "tenant": {
-                    "$ref": "#/definitions/internal_module_auth.InviteTenantResponse"
+                    "$ref": "#/definitions/auth.InviteTenantResponse"
                 }
             }
         },
-        "internal_module_auth.InviteRequest": {
+        "auth.InviteRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -3075,7 +3111,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.InviteResponse": {
+        "auth.InviteResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -3083,7 +3119,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.InviteTenantResponse": {
+        "auth.InviteTenantResponse": {
             "type": "object",
             "properties": {
                 "name": {
@@ -3091,7 +3127,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.LoginRequest": {
+        "auth.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -3113,7 +3149,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.MeResponse": {
+        "auth.MeResponse": {
             "type": "object",
             "properties": {
                 "display_name": {
@@ -3141,7 +3177,7 @@ const docTemplate = `{
                     "description": "Providers are the sign-in methods the account has: a password, a\nlinked Google identity.",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/internal_module_auth.ProvidersResponse"
+                            "$ref": "#/definitions/auth.ProvidersResponse"
                         }
                     ]
                 },
@@ -3152,11 +3188,11 @@ const docTemplate = `{
                     }
                 },
                 "tenant": {
-                    "$ref": "#/definitions/internal_module_auth.TenantSummaryResponse"
+                    "$ref": "#/definitions/auth.TenantSummaryResponse"
                 }
             }
         },
-        "internal_module_auth.ProvidersResponse": {
+        "auth.ProvidersResponse": {
             "type": "object",
             "properties": {
                 "google": {
@@ -3167,7 +3203,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.RefreshRequest": {
+        "auth.RefreshRequest": {
             "type": "object",
             "required": [
                 "refresh_token"
@@ -3179,7 +3215,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.RegisterRequest": {
+        "auth.RegisterRequest": {
             "type": "object",
             "required": [
                 "display_name",
@@ -3206,7 +3242,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.ResetPasswordRequest": {
+        "auth.ResetPasswordRequest": {
             "type": "object",
             "required": [
                 "password",
@@ -3222,7 +3258,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.ServiceTokenRequest": {
+        "auth.ServiceTokenRequest": {
             "type": "object",
             "required": [
                 "client_id",
@@ -3241,7 +3277,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.ServiceTokenResponse": {
+        "auth.ServiceTokenResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -3255,7 +3291,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.SwitchTenantRequest": {
+        "auth.SwitchTenantRequest": {
             "type": "object",
             "required": [
                 "tenant_id"
@@ -3266,7 +3302,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.TenantResponse": {
+        "auth.TenantResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -3283,7 +3319,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.TenantSummaryResponse": {
+        "auth.TenantSummaryResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -3297,7 +3333,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.TokenResponse": {
+        "auth.TokenResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -3316,17 +3352,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tenant": {
-                    "$ref": "#/definitions/internal_module_auth.TenantSummaryResponse"
+                    "$ref": "#/definitions/auth.TenantSummaryResponse"
                 },
                 "token_type": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/internal_module_auth.UserSummaryResponse"
+                    "$ref": "#/definitions/auth.UserSummaryResponse"
                 }
             }
         },
-        "internal_module_auth.UpdateMeRequest": {
+        "auth.UpdateMeRequest": {
             "type": "object",
             "required": [
                 "display_name"
@@ -3339,7 +3375,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.UserSummaryResponse": {
+        "auth.UserSummaryResponse": {
             "type": "object",
             "properties": {
                 "display_name": {
@@ -3353,7 +3389,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_auth.VerifyEmailRequest": {
+        "auth.VerifyEmailRequest": {
             "type": "object",
             "properties": {
                 "token": {
@@ -3361,7 +3397,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.CreateRoleRequest": {
+        "rbac.CreateRoleRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -3383,7 +3419,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.CreateTemplateRequest": {
+        "rbac.CreateTemplateRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -3405,7 +3441,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.InternalRoleMapResponse": {
+        "rbac.InternalRoleMapResponse": {
             "type": "object",
             "properties": {
                 "roles": {
@@ -3426,7 +3462,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.PermissionResponse": {
+        "rbac.PermissionResponse": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3440,7 +3476,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.RolePageResponse": {
+        "rbac.RolePageResponse": {
             "type": "object",
             "properties": {
                 "has_next": {
@@ -3452,7 +3488,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_rbac.RoleSummaryResponse"
+                        "$ref": "#/definitions/rbac.RoleSummaryResponse"
                     }
                 },
                 "page": {
@@ -3469,7 +3505,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.RoleRefResponse": {
+        "rbac.RoleRefResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -3480,7 +3516,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.RoleResponse": {
+        "rbac.RoleResponse": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3506,7 +3542,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.RoleSummaryResponse": {
+        "rbac.RoleSummaryResponse": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3532,7 +3568,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.SetPermissionsRequest": {
+        "rbac.SetPermissionsRequest": {
             "type": "object",
             "required": [
                 "permissions"
@@ -3550,7 +3586,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.SetUserRolesRequest": {
+        "rbac.SetUserRolesRequest": {
             "type": "object",
             "required": [
                 "role_ids"
@@ -3564,7 +3600,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.TemplateResponse": {
+        "rbac.TemplateResponse": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3587,7 +3623,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.UpdateRoleRequest": {
+        "rbac.UpdateRoleRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3605,7 +3641,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.UpdateTemplateRequest": {
+        "rbac.UpdateTemplateRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3629,18 +3665,460 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_rbac.UserRolesResponse": {
+        "rbac.UserRolesResponse": {
             "type": "object",
             "properties": {
                 "roles": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_rbac.RoleRefResponse"
+                        "$ref": "#/definitions/rbac.RoleRefResponse"
                     }
                 }
             }
         },
-        "internal_module_session.SessionResponse": {
+        "response.BaseResponse-any": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {},
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-array_auth_TenantResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.TenantResponse"
+                    }
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-array_rbac_PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rbac.PermissionResponse"
+                    }
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-array_rbac_TemplateResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rbac.TemplateResponse"
+                    }
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-array_session_SessionResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/session.SessionResponse"
+                    }
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-audit_EntryPageResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/audit.EntryPageResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_AcceptedResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.AcceptedResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_AuthConfigResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.AuthConfigResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_InvitePreviewResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.InvitePreviewResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_InviteResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.InviteResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_MeResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.MeResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_ServiceTokenResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.ServiceTokenResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-auth_TokenResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.TokenResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-rbac_InternalRoleMapResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/rbac.InternalRoleMapResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-rbac_RolePageResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/rbac.RolePageResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-rbac_RoleResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/rbac.RoleResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-rbac_TemplateResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/rbac.TemplateResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-rbac_UserRolesResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/rbac.UserRolesResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-tenant_InternalTenantResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/tenant.InternalTenantResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-tenant_TenantPageResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/tenant.TenantPageResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-tenant_TenantResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/tenant.TenantResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-user_AdminUserDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/user.AdminUserDetailResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-user_AdminUserPageResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/user.AdminUserPageResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.BaseResponse-user_InternalUserResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/user.InternalUserResponse"
+                },
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "session.SessionResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3664,7 +4142,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_tenant.CreateTenantRequest": {
+        "tenant.CreateTenantRequest": {
             "type": "object",
             "required": [
                 "first_admin_email",
@@ -3683,7 +4161,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_tenant.InternalTenantResponse": {
+        "tenant.InternalTenantResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -3700,7 +4178,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_tenant.TenantPageResponse": {
+        "tenant.TenantPageResponse": {
             "type": "object",
             "properties": {
                 "has_next": {
@@ -3712,7 +4190,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_tenant.TenantSummaryResponse"
+                        "$ref": "#/definitions/tenant.TenantSummaryResponse"
                     }
                 },
                 "page": {
@@ -3729,7 +4207,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_tenant.TenantResponse": {
+        "tenant.TenantResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3752,7 +4230,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_tenant.TenantSummaryResponse": {
+        "tenant.TenantSummaryResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3778,7 +4256,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_tenant.UpdateTenantRequest": {
+        "tenant.UpdateTenantRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -3799,7 +4277,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_user.AdminUserDetailResponse": {
+        "user.AdminUserDetailResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3821,12 +4299,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "providers": {
-                    "$ref": "#/definitions/internal_module_user.ProvidersResponse"
+                    "$ref": "#/definitions/user.ProvidersResponse"
                 },
                 "roles": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_user.RoleRefResponse"
+                        "$ref": "#/definitions/user.RoleRefResponse"
                     }
                 },
                 "status": {
@@ -3837,7 +4315,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_user.AdminUserPageResponse": {
+        "user.AdminUserPageResponse": {
             "type": "object",
             "properties": {
                 "has_next": {
@@ -3849,7 +4327,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_user.AdminUserResponse"
+                        "$ref": "#/definitions/user.AdminUserResponse"
                     }
                 },
                 "page": {
@@ -3866,7 +4344,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_user.AdminUserResponse": {
+        "user.AdminUserResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3890,7 +4368,7 @@ const docTemplate = `{
                 "roles": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_module_user.RoleRefResponse"
+                        "$ref": "#/definitions/user.RoleRefResponse"
                     }
                 },
                 "status": {
@@ -3898,7 +4376,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_user.InternalUserResponse": {
+        "user.InternalUserResponse": {
             "type": "object",
             "properties": {
                 "display_name": {
@@ -3912,7 +4390,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_user.ProvidersResponse": {
+        "user.ProvidersResponse": {
             "type": "object",
             "properties": {
                 "google": {
@@ -3923,455 +4401,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_module_user.RoleRefResponse": {
+        "user.RoleRefResponse": {
             "type": "object",
             "properties": {
                 "id": {
                     "type": "string"
                 },
                 "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-any": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {},
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-array_internal_module_auth_TenantResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/internal_module_auth.TenantResponse"
-                    }
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-array_internal_module_rbac_PermissionResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/internal_module_rbac.PermissionResponse"
-                    }
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-array_internal_module_rbac_TemplateResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/internal_module_rbac.TemplateResponse"
-                    }
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-array_internal_module_session_SessionResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/internal_module_session.SessionResponse"
-                    }
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_audit_EntryPageResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_audit.EntryPageResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_AcceptedResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.AcceptedResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_AuthConfigResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.AuthConfigResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_InvitePreviewResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.InvitePreviewResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_InviteResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.InviteResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_MeResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.MeResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_ServiceTokenResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.ServiceTokenResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_auth_TokenResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_auth.TokenResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_rbac_InternalRoleMapResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_rbac.InternalRoleMapResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_rbac_RolePageResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_rbac.RolePageResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_rbac_RoleResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_rbac.RoleResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_rbac_TemplateResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_rbac.TemplateResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_rbac_UserRolesResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_rbac.UserRolesResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_tenant_InternalTenantResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_tenant.InternalTenantResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_tenant_TenantPageResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_tenant.TenantPageResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_tenant_TenantResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_tenant.TenantResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_user_AdminUserDetailResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_user.AdminUserDetailResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_user_AdminUserPageResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_user.AdminUserPageResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.BaseResponse-internal_module_user_InternalUserResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "data": {
-                    "$ref": "#/definitions/internal_module_user.InternalUserResponse"
-                },
-                "error": {},
-                "message": {
-                    "type": "string"
-                },
-                "timestamp": {
                     "type": "string"
                 }
             }
