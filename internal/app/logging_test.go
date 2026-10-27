@@ -12,6 +12,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/metrics"
 	"github.com/biairmal/go-sdk/lib/tracer"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/biairmal/go-identity/internal/platform/testkit"
 )
@@ -29,7 +30,7 @@ func TestLogLinesAreJSONWithRequestID(t *testing.T) {
 		log := NewLogger(&cfg)
 		a := &App{cfg: cfg}
 		chain := middlewareChain(&cfg, log, tracer.NewNoOp(), metrics.NewNoOp())
-		srv := testkit.Server(t, a.routes(nil, chain))
+		srv := testkit.Server(t, a.routes(chi.NewRouter(), nil, chain))
 		header := http.Header{"X-Request-Id": {"req-log-test"}}
 		testkit.Do[any](t, srv, http.MethodPost, "/v1/nope", map[string]string{"email": "bia@example.com"}, header)
 	})

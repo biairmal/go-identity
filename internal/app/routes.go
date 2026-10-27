@@ -22,11 +22,11 @@ import (
 	"github.com/biairmal/go-identity/internal/platform/httpx"
 )
 
-// routes builds the router: the middleware chain, operational endpoints, the
-// route groups, then every module. Unknown paths and methods get the go-sdk
-// error envelope.
-func (a *App) routes(modules []Module, chain []func(http.Handler) http.Handler) chi.Router {
-	r := chi.NewRouter()
+// routes mounts the middleware chain, operational endpoints, the route
+// groups, then every module onto r. Unknown paths and methods get the go-sdk
+// error envelope. r is a fresh chi.NewRouter() when identity runs standalone,
+// or a host's own router when mounted (identity.Register).
+func (a *App) routes(r chi.Router, modules []Module, chain []func(http.Handler) http.Handler) chi.Router {
 	r.Use(chain...)
 	// Set before the groups are mounted: chi copies them into subrouters at mount time.
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {

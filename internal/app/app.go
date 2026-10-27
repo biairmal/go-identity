@@ -21,6 +21,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
+	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
@@ -51,10 +52,43 @@ func NewLogger(cfg *Config) logger.Logger {
 	return logger.NewZerolog(&opts)
 }
 
-// New builds every dependency and the HTTP handler. It connects to the
-// database, so it fails when the leader is unreachable.
+// New builds every dependency and the HTTP handler, including a database
+// connection it owns. It fails when the leader is unreachable.
 func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
-	a := &App{cfg: *cfg, log: log}
+	db, err := sqlkit.New(ctx, &cfg.Database)
+	if err != nil {
+		return nil, err
+	}
+	a, err := build(ctx, cfg, log, db, chi.NewRouter())
+	if err != nil {
+		if cerr := db.Close(); cerr != nil {
+			log.Error("database close", logger.F("error", cerr.Error()))
+		}
+		return nil, err
+	}
+	return a, nil
+}
+
+// Register builds identity atop a host's own database connection and mounts
+// its routes onto r, for a client monolith (TRD 1.1 "mounted" mode) instead
+// of running identity as its own process. The host owns db's lifecycle:
+// Register never closes it, on success or failure.
+func Register(ctx context.Context, r chi.Router, cfg *Config, log logger.Logger, db *sqlkit.DB) (*App, error) {
+	a, err := build(ctx, cfg, log, db, r)
+	if err != nil {
+		return nil, err
+	}
+	// There is no separate Serve step in mounted mode: readyz must answer
+	// 200 as soon as the host starts routing to r.
+	a.ready.Store(true)
+	return a, nil
+}
+
+// build wires every dependency onto db and mounts the handler on r. The
+// caller owns db; build only ever closes what it created itself (tracer,
+// Redis) when a later step fails.
+func build(ctx context.Context, cfg *Config, log logger.Logger, db *sqlkit.DB, r chi.Router) (*App, error) {
+	a := &App{cfg: *cfg, log: log, db: db}
 
 	a.metrics = newRegistry()
 	tr, rec, err := observability(cfg, log, a.metrics)
@@ -63,21 +97,14 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 	}
 	a.tracer = tr
 
-	db, err := sqlkit.New(ctx, &a.cfg.Database)
-	if err != nil {
-		a.close(ctx)
-		return nil, err
-	}
-	a.db = db
-
 	if err := checkSchema(ctx, db); err != nil {
-		a.close(ctx)
+		a.closeOwn(ctx)
 		return nil, err
 	}
 
 	limiter, refreshLimiter, err := a.newLimiters()
 	if err != nil {
-		a.close(ctx)
+		a.closeOwn(ctx)
 		return nil, err
 	}
 	deps := Deps{
@@ -86,24 +113,24 @@ func New(ctx context.Context, cfg *Config, log logger.Logger) (*App, error) {
 	}
 	modules, svc, err := buildModules(&a.cfg, &deps)
 	if err != nil {
-		a.close(ctx)
+		a.closeOwn(ctx)
 		return nil, err
 	}
 	if err := a.bootstrap(ctx, svc); err != nil {
-		a.close(ctx)
+		a.closeOwn(ctx)
 		return nil, err
 	}
 
 	chain := middlewareChain(cfg, log, tr, rec)
 	authMW, err := a.authMiddleware()
 	if err != nil {
-		a.close(ctx)
+		a.closeOwn(ctx)
 		return nil, err
 	}
 	if authMW != nil {
 		chain = append(chain, authMW, restrictScopedTokens(scopedRoutes))
 	}
-	a.handler = a.routes(modules, chain)
+	a.handler = a.routes(r, modules, chain)
 	return a, nil
 }
 
@@ -233,16 +260,25 @@ func (a *App) Serve(ctx context.Context) error {
 	)
 }
 
-// close releases dependencies when startup fails part-way.
+// close releases every dependency, db included. Only New's own App, which
+// owns its database connection, may call this; build and Register must not,
+// since a host passes its own db into Register and keeps owning it.
 func (a *App) close(ctx context.Context) {
-	if a.tracer != nil {
-		if err := a.tracer.Shutdown(ctx); err != nil {
-			a.log.Error("tracer shutdown", logger.F("error", err.Error()))
-		}
-	}
+	a.closeOwn(ctx)
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
 			a.log.Error("database close", logger.F("error", err.Error()))
+		}
+	}
+}
+
+// closeOwn releases the dependencies build creates itself (tracer, Redis),
+// never db: its caller owns that connection's lifecycle, whether it is New
+// (which then closes db too) or a host calling Register.
+func (a *App) closeOwn(ctx context.Context) {
+	if a.tracer != nil {
+		if err := a.tracer.Shutdown(ctx); err != nil {
+			a.log.Error("tracer shutdown", logger.F("error", err.Error()))
 		}
 	}
 	if a.redis != nil {
