@@ -171,6 +171,33 @@ func (m *Module) removeUser(r *http.Request) (any, error) {
 	return m.noContent(r, m.admin.Remove)
 }
 
+// getInternalUser answers GET /v1/internal/users/{id} (TRD 9.8). Service
+// tokens only, by service_token scope middleware.
+//
+//	@Summary     Get a user (internal)
+//	@Description A user by ID, with no email. Service tokens only.
+//	@Tags        internal
+//	@Produce     json
+//	@Param       id path string true "User ID"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[user.InternalUserResponse]
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     403 {object} response.BaseResponse[any] "Not a service token"
+//	@Failure     404 {object} response.BaseResponse[any] "No such user"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/internal/users/{id} [get]
+func (m *Module) getInternalUser(r *http.Request) (any, error) {
+	id, err := userID(r)
+	if err != nil {
+		return nil, err
+	}
+	u, err := m.svc.Get(r.Context(), id)
+	if err != nil {
+		return nil, err
+	}
+	return newInternalUserResponse(u), nil
+}
+
 // noContent runs an action on the {id} user and answers 204.
 func (m *Module) noContent(r *http.Request, action func(ctx context.Context, id uuid.UUID) error) (any, error) {
 	id, err := userID(r)

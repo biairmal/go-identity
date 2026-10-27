@@ -39,8 +39,8 @@ func (m *Module) Service() *Service { return m.svc }
 func (m *Module) Authorizer() *Authorizer { return m.svc.az }
 
 // Register mounts the admin role and permission endpoints, behind
-// roles:manage, and user role assignment, behind users:manage. The internal
-// role map arrives with T7.1.
+// roles:manage, user role assignment, behind users:manage, and the internal
+// role map, behind the service-token scope.
 func (m *Module) Register(rt *httpx.Routes) {
 	rt.Admin.With(middleware.RequirePermission(m.svc.az, PermUsersManage)).
 		Put("/users/{id}/roles", httpx.Handle(m.setUserRoles))
@@ -58,4 +58,6 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.Super.Post("/role-templates", httpx.Handle(m.createTemplate))
 	rt.Super.Patch("/role-templates/{id}", httpx.Handle(m.updateTemplate))
 	rt.Super.Delete("/role-templates/{id}", httpx.Handle(m.deleteTemplate))
+
+	rt.Internal.Get("/roles/permissions", httpx.Handle(m.getInternalRolePermissions))
 }

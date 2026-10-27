@@ -40,4 +40,6 @@ func (m *Module) Register(rt *httpx.Routes) {
 	rt.Super.Post("/tenants", httpx.Handle(m.createTenant))
 	rt.Super.Get("/tenants/{id}", httpx.Handle(m.getTenant))
 	rt.Super.Patch("/tenants/{id}", httpx.Handle(m.updateTenant))
+
+	rt.Internal.Get("/tenants/{id}", httpx.Handle(m.getInternalTenant))
 }

@@ -46,6 +46,15 @@ type UpdateTenantRequest struct {
 	Version *int `json:"version"`
 }
 
+// InternalTenantResponse is GET /v1/internal/tenants/{id} (TRD 9.8): the
+// minimal shape a resource service needs.
+type InternalTenantResponse struct {
+	ID     string `json:"id"`
+	Slug   string `json:"slug"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
 // newTenantResponse builds the single-tenant response.
 func newTenantResponse(t *Tenant) *TenantResponse {
 	return &TenantResponse{

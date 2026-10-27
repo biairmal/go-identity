@@ -116,6 +116,29 @@ func (m *Module) getTenant(r *http.Request) (any, error) {
 	return m.svc.GetTenant(r.Context(), id)
 }
 
+// getInternalTenant answers GET /v1/internal/tenants/{id} (TRD 9.8). Service
+// tokens only, by service_token scope middleware.
+//
+//	@Summary     Get a tenant (internal)
+//	@Description A tenant by ID. Service tokens only.
+//	@Tags        internal
+//	@Produce     json
+//	@Param       id path string true "Tenant ID"
+//	@Security    BearerAuth
+//	@Success     200 {object} response.BaseResponse[tenant.InternalTenantResponse]
+//	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
+//	@Failure     403 {object} response.BaseResponse[any] "Not a service token"
+//	@Failure     404 {object} response.BaseResponse[any] "No such tenant"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/internal/tenants/{id} [get]
+func (m *Module) getInternalTenant(r *http.Request) (any, error) {
+	id, err := tenantID(r)
+	if err != nil {
+		return nil, err
+	}
+	return m.svc.InternalTenant(r.Context(), id)
+}
+
 // updateTenant answers PATCH /v1/admin/tenants/{id}.
 //
 //	@Summary     Update a tenant

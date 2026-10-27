@@ -137,6 +137,16 @@ func Default() Config {
 	}
 }
 
+// ServiceClient returns the configured client by id, for POST /v1/auth/token.
+func (c *Config) ServiceClient(id string) (ServiceClient, bool) {
+	for _, sc := range c.ServiceClients {
+		if sc.ID == id {
+			return sc, true
+		}
+	}
+	return ServiceClient{}, false
+}
+
 // EmailBaseURL is the base of the links in emails: the first frontend URL.
 func (c *Config) EmailBaseURL() string {
 	if len(c.FrontendURLs) == 0 {

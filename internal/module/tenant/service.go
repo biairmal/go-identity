@@ -131,6 +131,17 @@ func (s *Service) GetTenant(ctx context.Context, id uuid.UUID) (*TenantResponse,
 	return newTenantResponse(t), nil
 }
 
+// InternalTenant returns one tenant for GET /v1/internal/tenants/{id} (TRD
+// 9.8): the minimal shape a resource service needs, with no member count or
+// version.
+func (s *Service) InternalTenant(ctx context.Context, id uuid.UUID) (*InternalTenantResponse, error) {
+	t, err := s.repo.ByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &InternalTenantResponse{ID: t.ID.String(), Slug: t.Slug, Name: t.Name, Status: t.Status}, nil
+}
+
 // CreateTenant creates a tenant, copies the template roles into it and
 // invites the first admin, all in one transaction (9.7). A slug already in
 // use is DUPLICATE.

@@ -32,10 +32,16 @@ func TestRouteGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := testkit.Server(t, r)
-	for _, p := range []string{"/root", "/v1/api", "/v1/me/profile", "/v1/admin/users", "/v1/internal/users"} {
+	// /v1/internal is left out: requireServiceScope gates it even with no
+	// auth middleware in the chain, and that gate has its own tests
+	// (TestRequireServiceScope).
+	for _, p := range []string{"/root", "/v1/api", "/v1/me/profile", "/v1/admin/users"} {
 		if s := testkit.Do[any](t, srv, http.MethodGet, p, nil, nil).Status; s != http.StatusNoContent {
 			t.Errorf("GET %s = %d, want 204 (routes: %v)", p, s, got)
 		}
+	}
+	if s := testkit.Do[any](t, srv, http.MethodGet, "/v1/internal/users", nil, nil).Status; s != http.StatusForbidden {
+		t.Errorf("GET /v1/internal/users = %d, want 403 without a service token (routes: %v)", s, got)
 	}
 }
 

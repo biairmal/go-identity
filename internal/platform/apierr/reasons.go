@@ -36,6 +36,8 @@ const (
 	ReasonVersionConflict        Reason = "VERSION_CONFLICT"
 	ReasonDuplicate              Reason = "DUPLICATE"
 	ReasonRateLimited            Reason = "RATE_LIMITED"
+	ReasonInvalidClient          Reason = "INVALID_CLIENT"
+	ReasonUnsupportedGrantType   Reason = "UNSUPPORTED_GRANT_TYPE"
 
 	// ReasonTenantRequired is not an error: sign-in answers 200 with the
 	// tenants to choose from. It has no errorz code.
@@ -73,4 +75,6 @@ var reasonCodes = map[Reason]string{ //nolint:dupl // the test pins the same tab
 	ReasonVersionConflict:        errorz.CodeConflict,
 	ReasonDuplicate:              errorz.CodeConflict,
 	ReasonRateLimited:            errorz.CodeTooManyRequests,
+	ReasonInvalidClient:          errorz.CodeUnauthorized,
+	ReasonUnsupportedGrantType:   errorz.CodeBadRequest,
 }

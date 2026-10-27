@@ -23,6 +23,7 @@ const (
 	logoutAllPath      = "/auth/logout-all"
 	forgotPasswordPath = "/auth/password/forgot"
 	resetPasswordPath  = "/auth/password/reset"
+	serviceTokenPath   = "/auth/token" //nolint:gosec // a route path, not a credential
 )
 
 // switchTenantPath is authenticated (not public): the token identifies the
@@ -321,4 +322,27 @@ func (m *Module) resetPassword(r *http.Request) (any, error) {
 		return nil, err
 	}
 	return &response.Success{HTTPStatusCode: http.StatusNoContent}, nil
+}
+
+// issueServiceToken answers POST /v1/auth/token with a short-lived
+// scope:internal token for a resource service configured in
+// modules.auth.service_clients.
+//
+//	@Summary     Service token
+//	@Description Exchanges a resource service's client credentials for a short-lived token scoped to /v1/internal.
+//	@Tags        auth
+//	@Accept      json
+//	@Produce     json
+//	@Param       body body auth.ServiceTokenRequest true "Request body"
+//	@Success     200 {object} response.BaseResponse[auth.ServiceTokenResponse]
+//	@Failure     400 {object} response.BaseResponse[any] "Invalid body or unsupported grant_type"
+//	@Failure     401 {object} response.BaseResponse[any] "Unknown client or wrong secret"
+//	@Failure     500 {object} response.BaseResponse[any] "Internal error"
+//	@Router      /v1/auth/token [post]
+func (m *Module) issueServiceToken(r *http.Request) (any, error) {
+	var in ServiceTokenRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return nil, err
+	}
+	return m.serviceTokens.Issue(r.Context(), &in)
 }

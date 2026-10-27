@@ -184,6 +184,22 @@ type InviteTenantResponse struct {
 	Name string `json:"name"`
 }
 
+// ServiceTokenRequest is the body of POST /v1/auth/token (TRD 9.4).
+type ServiceTokenRequest struct {
+	GrantType    string `json:"grant_type" validate:"required"`
+	ClientID     string `json:"client_id" validate:"required"`
+	ClientSecret string `json:"client_secret" validate:"required"`
+}
+
+// ServiceTokenResponse is the 200 of POST /v1/auth/token: no refresh token
+// and no user, since the caller is a resource service, not a signed-in
+// person.
+type ServiceTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
 // AcceptInviteRequest is the body of POST /v1/auth/invite/accept.
 type AcceptInviteRequest struct {
 	Token string `json:"token" validate:"required,max=256"`

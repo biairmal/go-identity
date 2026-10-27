@@ -57,6 +57,7 @@ auth:                                         # enabled + auth.Config
     - { method: POST, pattern: /v1/auth/password/reset, public: true }
     - { method: GET, pattern: /v1/auth/invite/*, public: true }     # invite preview; the token is the path
     - { method: POST, pattern: /v1/auth/invite/accept, public: true }
+    - { method: POST, pattern: /v1/auth/token, public: true }       # client credentials in the body (section 9.4)
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}
