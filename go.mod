@@ -3,7 +3,7 @@ module github.com/biairmal/go-identity
 go 1.26.0
 
 require (
-	github.com/biairmal/go-sdk v0.2.0
+	github.com/biairmal/go-sdk v0.3.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0

@@ -10,8 +10,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/biairmal/go-sdk v0.2.0 h1:KH7VJbPgxu1Sr/dQ4FiJ1h2Fd3uNZ6UoYX/uWOrE9/A=
-github.com/biairmal/go-sdk v0.2.0/go.mod h1:+BOBwu4foWNwFTVLQ5TU4ji+QpiJCy+okZKIMtEs8hI=
+github.com/biairmal/go-sdk v0.3.0 h1:hKSxaXnCJ4PuEunsSpbzETB+Po/SfNsY5bgWFBMqQNw=
+github.com/biairmal/go-sdk v0.3.0/go.mod h1:+BOBwu4foWNwFTVLQ5TU4ji+QpiJCy+okZKIMtEs8hI=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
 github.com/bsm/ginkgo/v2 v2.12.0/go.mod h1:SwYbGRRDovPVboqFv0tPTcG1sN61LM1Z4ARdbAV9g4c=
 github.com/bsm/gomega v1.27.10 h1:yeMWxP2pV2fG3FgAODIY8EiRE3dy0aeFYt4l7wh6yKA=

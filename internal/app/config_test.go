@@ -21,6 +21,10 @@ func validConfig(t *testing.T) Config {
 }
 
 func TestConfigValidate(t *testing.T) {
+	// smtp sets the mail block, which is otherwise empty (logging stub).
+	smtp := func(from, tls string) func(c *Config) {
+		return func(c *Config) { c.Mail.Host, c.Mail.From, c.Mail.TLS = "smtp.example.com", from, tls }
+	}
 	tests := []struct {
 		name    string
 		mutate  func(c *Config)
@@ -38,6 +42,10 @@ func TestConfigValidate(t *testing.T) {
 		{"metrics on needs path", func(c *Config) { c.Metrics.Enabled = true; c.Metrics.Path = "" }, "metrics"},
 		{"swagger on needs credentials", func(c *Config) { c.Swagger.Enabled = true }, "swagger"},
 		{"tracing on needs endpoint", func(c *Config) { c.Tracing.Enabled = true; c.Tracing.Endpoint = "" }, "tracing"},
+		{"mail host needs a sender", smtp("", "starttls"), "mail"},
+		{"mail sender must parse", smtp("not an address", "starttls"), "mail"},
+		{"mail tls mode", smtp("no-reply@example.com", "ssl"), "mail"},
+		{"mail configured", smtp("Identity <no-reply@example.com>", "starttls"), ""},
 		{"negative drain delay", func(c *Config) { c.Lifecycle.DrainDelay = -1 }, "lifecycle"},
 	}
 	for _, tt := range tests {
