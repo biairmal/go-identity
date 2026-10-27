@@ -34,7 +34,8 @@ func (f *loginFixture) signInTokens(t *testing.T) (access, refresh string) {
 	return access, refresh
 }
 
-// TestMeIntegration reads and renames the caller.
+// TestMeIntegration reads and renames the caller; renaming leaves the
+// credentials untouched.
 func TestMeIntegration(t *testing.T) {
 	f := newLoginFixture(t, nil)
 	f.register(t)
@@ -54,9 +55,15 @@ func TestMeIntegration(t *testing.T) {
 		t.Errorf("GET /v1/me = %s", r.Raw)
 	}
 
+	credentials := `SELECT password_hash || updated_at::text FROM credentials
+		WHERE user_id = (SELECT id FROM users WHERE NOT is_super_admin)`
+	before := f.text(t, credentials)
 	r = f.call(t, http.MethodPatch, "/v1/me", access, map[string]any{"display_name": "  Bia B  "})
 	if r.Status != http.StatusOK || r.Data["display_name"] != "Bia B" {
 		t.Fatalf("PATCH /v1/me = %d %s", r.Status, r.Raw)
+	}
+	if f.text(t, credentials) != before {
+		t.Error("updating the profile changed the credentials")
 	}
 	if r := f.call(t, http.MethodGet, "/v1/me", access, nil); r.Data["display_name"] != "Bia B" {
 		t.Errorf("display_name after PATCH = %v", r.Data["display_name"])
