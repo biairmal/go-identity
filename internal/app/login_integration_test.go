@@ -35,6 +35,7 @@ func newLoginFixture(t *testing.T, mutate func(c *Config)) *loginFixture {
 	cfg.Database = testkit.PostgresConfig(t)
 	cfg.Auth.Enabled = true
 	cfg.Auth.Local.JWKSURL = srv.URL + "/.well-known/jwks.json"
+	cfg.Modules.Auth.PublicURL = srv.URL
 	cfg.Auth.CacheTTL = 0
 	cfg.Modules.User.SuperAdmin = testSuperAdmin
 	cfg.Modules.Auth.Providers.Password.RequireEmailVerification = false
