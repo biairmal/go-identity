@@ -37,6 +37,12 @@ func TestModuleConfigValidate(t *testing.T) {
 			c.Modules.Auth.Providers.Google.ClientID = "id"
 			c.Modules.Auth.Providers.Google.ClientSecret = "secret"
 		}, ""},
+		{"google with a relative issuer url", func(c *Config) {
+			c.Modules.Auth.Providers.Google.Enabled = true
+			c.Modules.Auth.Providers.Google.ClientID = "id"
+			c.Modules.Auth.Providers.Google.ClientSecret = "secret"
+			c.Modules.Auth.Providers.Google.IssuerURL = "accounts.google.com"
+		}, "modules.auth"},
 		{"password below the floor", func(c *Config) {
 			c.Modules.Auth.Providers.Password.MinLength = 8
 		}, "modules.auth"},

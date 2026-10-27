@@ -1816,6 +1816,219 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/auth/exchange": {
+            "post": {
+                "description": "Trades the single-use, 60-second code from the Google callback for tokens.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Exchange a Google callback code",
+                "parameters": [
+                    {
+                        "description": "Request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.ExchangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-auth_TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "TOKEN_INVALID or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "403": {
+                        "description": "ACCOUNT_DISABLED or TENANT_SUSPENDED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/google/callback": {
+            "get": {
+                "description": "Redirects to redirect_to with code=\u003cexchange code\u003e, linked=1 or error=\u003creason\u003e; never tokens.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Google callback",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization code from Google",
+                        "name": "code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "State from the start redirect",
+                        "name": "state",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to the frontend"
+                    },
+                    "400": {
+                        "description": "OAUTH_STATE_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/google/link/start": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Same as Google start, but the callback links Google to the signed-in user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "Link Google",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Frontend URL to return to, from modules.auth.frontend_urls",
+                        "name": "redirect_to",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to Google"
+                    },
+                    "400": {
+                        "description": "redirect_to not allowed",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/google/start": {
+            "get": {
+                "description": "Redirects to Google with state, nonce and a PKCE challenge. redirect_to must be allow-listed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Begin Google sign-in",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Frontend URL to return to, from modules.auth.frontend_urls",
+                        "name": "redirect_to",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tenant slug (multi mode)",
+                        "name": "tenant",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to Google"
+                    },
+                    "400": {
+                        "description": "redirect_to not allowed",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "404": {
+                        "description": "PROVIDER_DISABLED",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/response.BaseResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/invite/accept": {
             "post": {
                 "description": "Joins the tenant and signs in. password is required only when the account has none.",
@@ -3070,6 +3283,19 @@ const docTemplate = `{
             "properties": {
                 "email": {
                     "type": "string"
+                }
+            }
+        },
+        "auth.ExchangeRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "description": "Code is the one-time code the Google callback put in redirect_to.",
+                    "type": "string",
+                    "maxLength": 256
                 }
             }
         },

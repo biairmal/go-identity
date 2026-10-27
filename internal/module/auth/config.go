@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/biairmal/go-sdk/lib/errorz"
+
+	"github.com/biairmal/go-identity/internal/module/auth/provider/google"
 )
 
 // Token claim modes for TokenConfig.Claims.
@@ -71,6 +73,9 @@ type GoogleProviderConfig struct {
 	Enabled      bool   `mapstructure:"enabled"`
 	ClientID     string `mapstructure:"client_id"`
 	ClientSecret string `mapstructure:"client_secret"`
+	// IssuerURL is the OIDC issuer whose discovery document names the
+	// endpoints and keys. Empty means Google; tests point it at a fake.
+	IssuerURL string `mapstructure:"issuer_url"`
 	// AllowedDomains restricts sign-in to these email domains; empty allows
 	// any.
 	AllowedDomains []string `mapstructure:"allowed_domains"`
@@ -118,7 +123,7 @@ func Default() Config {
 		FrontendURLs: []string{"http://localhost:3000"},
 		Providers: ProvidersConfig{
 			Password: PasswordProviderConfig{Enabled: true, MinLength: 10, RequireEmailVerification: true},
-			Google:   GoogleProviderConfig{AutoLinkVerifiedEmail: true},
+			Google:   GoogleProviderConfig{IssuerURL: google.Issuer, AutoLinkVerifiedEmail: true},
 		},
 		Registration: RegistrationConfig{Enabled: true, DefaultRoles: []string{"member"}},
 		Token: TokenConfig{
@@ -238,6 +243,11 @@ func (c *Config) validateProviders() error {
 		}
 		if c.PublicURL == "" {
 			return errorz.BadRequest().WithMessage("providers.google.enabled requires public_url")
+		}
+		if p.Google.IssuerURL != "" {
+			if err := absoluteURL("providers.google.issuer_url", p.Google.IssuerURL); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

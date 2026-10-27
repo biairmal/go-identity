@@ -82,6 +82,12 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required,max=256"`
 }
 
+// ExchangeRequest is the body of POST /v1/auth/exchange.
+type ExchangeRequest struct {
+	// Code is the one-time code the Google callback put in redirect_to.
+	Code string `json:"code" validate:"required,max=256"`
+}
+
 // SwitchTenantRequest is the body of POST /v1/auth/switch-tenant.
 type SwitchTenantRequest struct {
 	TenantID uuid.UUID `json:"tenant_id" validate:"required"`

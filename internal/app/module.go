@@ -84,26 +84,30 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 		Authz:   rbacModule.Authorizer(),
 	})
 
-	userModule, err := newUserModule(cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service(), rbacModule)
+	// One cipher encrypts users.email_enc and identities.email_at_link.
+	cipher, err := newEmailCipher(cfg, deps.Log)
 	if err != nil {
 		return nil, nil, err
 	}
+	userModule := newUserModule(
+		cfg, deps, auditModule, tenantModule.Service(), sessionModule.Service(), rbacModule, cipher)
 
 	// auth loads the signing keys, so a service that cannot sign a token
 	// does not start.
 	authDeps := &identityauth.Deps{
-		DB:       deps.DB,
-		Log:      deps.Log,
-		Clock:    clock.System{},
-		Tenancy:  cfg.Modules.Tenant.Mode,
-		V:        deps.V,
-		Outbox:   deps.Outbox,
-		Users:    authUsers{svc: userModule.Service()},
-		Tenants:  tenantMemberships{svc: tenantModule.Service()},
-		Roles:    authRoles{svc: rbacModule.Service()},
-		Sessions: authSessions{svc: sessionModule.Service()},
-		Audit:    authAudit{w: auditModule.Writer()},
-		Authz:    rbacModule.Authorizer(),
+		DB:          deps.DB,
+		Log:         deps.Log,
+		Clock:       clock.System{},
+		Tenancy:     cfg.Modules.Tenant.Mode,
+		V:           deps.V,
+		Outbox:      deps.Outbox,
+		Users:       authUsers{svc: userModule.Service()},
+		Tenants:     tenantMemberships{svc: tenantModule.Service()},
+		Roles:       authRoles{svc: rbacModule.Service()},
+		Sessions:    authSessions{svc: sessionModule.Service()},
+		Audit:       authAudit{w: auditModule.Writer()},
+		Authz:       rbacModule.Authorizer(),
+		EmailCipher: cipher,
 	}
 	if deps.Limiter != nil {
 		// Assigned only when set, so the interface never holds a nil pointer.

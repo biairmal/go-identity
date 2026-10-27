@@ -25,6 +25,7 @@ oauth_states.nonce text NOT NULL
 oauth_states.redirect_to text NOT NULL
 oauth_states.tenant_slug text
 oauth_states.expires_at timestamp with time zone NOT NULL
+oauth_states.link_user_id uuid
 one_time_tokens.id uuid NOT NULL DEFAULT gen_random_uuid()
 one_time_tokens.user_id uuid NOT NULL
 one_time_tokens.tenant_id uuid
@@ -112,6 +113,7 @@ identities identities_pkey PRIMARY KEY (id)
 identities identities_provider_check CHECK ((provider = 'google'::text))
 identities identities_provider_provider_subject_key UNIQUE (provider, provider_subject)
 identities identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+oauth_states oauth_states_link_user_id_fkey FOREIGN KEY (link_user_id) REFERENCES users(id)
 oauth_states oauth_states_pkey PRIMARY KEY (state_hash)
 one_time_tokens one_time_tokens_pkey PRIMARY KEY (id)
 one_time_tokens one_time_tokens_purpose_check CHECK ((purpose = ANY (ARRAY['verify_email'::text, 'reset_password'::text, 'invite'::text, 'oauth_exchange'::text])))

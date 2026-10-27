@@ -17,17 +17,13 @@ import (
 )
 
 // newUserModule builds the user module with its ports wired over the audit,
-// tenant, session and rbac modules. The email cipher is built here, not inside
+// tenant, session and rbac modules. The caller builds the email cipher, not
 // user: the module declares the port and app owns the go-sdk crypto adapter
 // behind it.
 func newUserModule(
 	cfg *Config, deps *Deps, auditModule *audit.Module, tenants *tenant.Service, sessions *session.Service,
-	rbacModule *rbac.Module,
-) (*user.Module, error) {
-	cipher, err := newEmailCipher(cfg, deps.Log)
-	if err != nil {
-		return nil, err
-	}
+	rbacModule *rbac.Module, cipher user.EmailCipher,
+) *user.Module {
 	return user.New(cfg.Modules.User, &user.Deps{
 		DB:          deps.DB,
 		Log:         deps.Log,
@@ -39,7 +35,7 @@ func newUserModule(
 		Audit:       userAudit{w: auditModule.Writer()},
 		Roles:       userRoles{svc: rbacModule.Service()},
 		Authz:       rbacModule.Authorizer(),
-	}), nil
+	})
 }
 
 // SuperAdminReset gives the super admin with this email a new temporary
@@ -99,9 +95,9 @@ func superAdminsOver(cfg *Config, db *sqlkit.DB, log logger.Logger) (*user.Super
 	}).Service()
 	sessions := session.New(cfg.Modules.Session, &session.Deps{DB: db, Log: log, Clock: clock.System{}}).Service()
 	rbacModule := rbac.New(cfg.Modules.RBAC, rbac.Deps{DB: db, Log: log})
-	m, err := newUserModule(cfg, deps, auditModule, tenants, sessions, rbacModule)
+	cipher, err := newEmailCipher(cfg, log)
 	if err != nil {
 		return nil, err
 	}
-	return m.SuperAdmins(), nil
+	return newUserModule(cfg, deps, auditModule, tenants, sessions, rbacModule, cipher).SuperAdmins(), nil
 }

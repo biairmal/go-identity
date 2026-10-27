@@ -58,6 +58,9 @@ auth:                                         # enabled + auth.Config
     - { method: GET, pattern: /v1/auth/invite/*, public: true }     # invite preview; the token is the path
     - { method: POST, pattern: /v1/auth/invite/accept, public: true }
     - { method: POST, pattern: /v1/auth/token, public: true }       # client credentials in the body (section 9.4)
+    - { method: GET, pattern: /v1/auth/google/start, public: true }   # browser redirect to Google
+    - { method: GET, pattern: /v1/auth/google/callback, public: true }  # Google redirects back with code and state
+    - { method: POST, pattern: /v1/auth/exchange, public: true }    # one-time code from the callback
   local:
     algorithm: RS256
     jwks_url: ${AUTH_JWKS_URL:http://localhost:8080/.well-known/jwks.json}
@@ -116,6 +119,7 @@ modules:
         enabled: ${AUTH_GOOGLE_ENABLED:false}
         client_id: ${GOOGLE_CLIENT_ID:}
         client_secret: ${GOOGLE_CLIENT_SECRET:}
+        issuer_url: ${GOOGLE_ISSUER_URL:https://accounts.google.com}   # OIDC discovery base; a fake in tests
         allowed_domains: []
         auto_link_verified_email: true
 
