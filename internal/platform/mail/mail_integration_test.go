@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/biairmal/go-sdk/lib/sqlkit"
 
@@ -112,6 +113,36 @@ func TestFailedMailDeliveryKeepsTheToken(t *testing.T) {
 	}
 	if n := countRows(t, db, `sent_at IS NULL AND attempts = 1 AND payload->>'token' = 'raw-token'`); n != 1 {
 		t.Error("a failed mail row did not keep its payload for the retry")
+	}
+}
+
+// TestExpiredMailIsNeverSent checks Queue stores the token's expiry and a mail
+// whose link has expired never reaches the Mailer.
+func TestExpiredMailIsNeverSent(t *testing.T) {
+	db := testkit.Postgres(t)
+	ctx := context.Background()
+	outbox := database.NewOutbox(db)
+	rec := &recorder{}
+	dispatcher := database.NewDispatcher(db, map[string]database.Sender{
+		mail.Topic: mail.NewSender(rec, db),
+	}, nil)
+
+	m := message()
+	m.ExpiresAt = time.Now().Add(-time.Minute)
+	if err := mail.Queue(ctx, outbox, m); err != nil {
+		t.Fatalf("Queue: %v", err)
+	}
+	if n := countRows(t, db, `payload ? 'expires_at'`); n != 1 {
+		t.Fatal("the queued mail does not carry expires_at")
+	}
+	if n, err := dispatcher.DispatchOnce(ctx); err != nil || n != 1 {
+		t.Fatalf("DispatchOnce = %d, %v; want 1 row", n, err)
+	}
+	if len(rec.sent) != 0 {
+		t.Fatalf("the mailer was called %d times for an expired mail", len(rec.sent))
+	}
+	if n := countRows(t, db, `sent_at IS NULL AND last_error = '`+database.ExpiredReason+`'`); n != 1 {
+		t.Error("the expired mail was not recorded as expired")
 	}
 }
 

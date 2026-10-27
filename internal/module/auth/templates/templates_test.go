@@ -3,6 +3,7 @@ package templates_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/biairmal/go-identity/internal/module/auth/templates"
 )
@@ -19,19 +20,19 @@ func TestMessagesUseTheFrontendPaths(t *testing.T) {
 	}{
 		{
 			name:     "verify email",
-			msg:      templates.VerifyEmailMessage("bia@example.com", "tok", nil),
+			msg:      templates.VerifyEmailMessage("bia@example.com", "tok", time.Time{}, nil),
 			template: templates.VerifyEmail,
 			wantLink: base + "/verify-email#token=tok",
 		},
 		{
 			name:     "reset password",
-			msg:      templates.ResetPasswordMessage("bia@example.com", "tok", nil),
+			msg:      templates.ResetPasswordMessage("bia@example.com", "tok", time.Time{}, nil),
 			template: templates.ResetPassword,
 			wantLink: base + "/reset-password#token=tok",
 		},
 		{
 			name:     "invite",
-			msg:      templates.InviteMessage("bia@example.com", "tok", nil),
+			msg:      templates.InviteMessage("bia@example.com", "tok", time.Time{}, nil),
 			template: templates.Invite,
 			wantLink: base + "/invite#token=tok",
 		},
