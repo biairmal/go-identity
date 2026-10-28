@@ -65,7 +65,10 @@ type PasswordProviderConfig struct {
 	Enabled                  bool `mapstructure:"enabled"`
 	MinLength                int  `mapstructure:"min_length"`
 	RequireEmailVerification bool `mapstructure:"require_email_verification"`
-	BreachedPasswordCheck    bool `mapstructure:"breached_password_check"`
+	// BreachedPasswordCheck would reject passwords found in breach corpora
+	// (HIBP k-anonymity API). Not built yet: Validate rejects true so the
+	// key never silently does nothing.
+	BreachedPasswordCheck bool `mapstructure:"breached_password_check"`
 }
 
 // GoogleProviderConfig configures Google OIDC sign-in.
@@ -235,6 +238,10 @@ func (c *Config) validateProviders() error {
 	if p.Password.Enabled && p.Password.MinLength < minPasswordLength {
 		return errorz.BadRequest().
 			WithMessage(fmt.Sprintf("providers.password.min_length must be at least %d", minPasswordLength))
+	}
+	if p.Password.BreachedPasswordCheck {
+		return errorz.BadRequest().
+			WithMessage("providers.password.breached_password_check is not built yet; it must be false")
 	}
 	if p.Google.Enabled {
 		if p.Google.ClientID == "" || p.Google.ClientSecret == "" {
