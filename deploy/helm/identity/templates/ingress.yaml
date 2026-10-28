@@ -5,7 +5,12 @@ metadata:
   name: {{ include "identity.fullname" . }}
   labels:
     {{- include "identity.labels" . | nindent 4 }}
-  {{- with .Values.route.annotations }}
+  {{- $annotations := .Values.route.annotations }}
+  {{- if .Values.route.blockInternalPath }}
+  {{/* nginx-ingress only: TRD 9.8/T9.2, see docs/DECISIONS.md for other controllers. */}}
+  {{- $annotations = merge (dict "nginx.ingress.kubernetes.io/configuration-snippet" "if ($uri ~* \"^/v1/internal\") { return 404; }\n") $annotations }}
+  {{- end }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
