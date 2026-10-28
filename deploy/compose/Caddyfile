@@ -1,3 +1,10 @@
 {$DOMAIN:localhost} {
-	reverse_proxy api:8080
+	# TRD 9.8 / T9.2: /v1/internal is a service-to-service surface, not part of
+	# the public API. Resource services reach it directly on the Compose
+	# network (api:8080); the public edge answers 404 instead of forwarding.
+	route {
+		@internal path /v1/internal*
+		respond @internal 404
+		reverse_proxy api:8080
+	}
 }
