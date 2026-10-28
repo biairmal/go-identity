@@ -35,6 +35,11 @@ route:
   kind: ingress  # ingress | openshift
   host: ""
   annotations: {}
+  # TRD 9.8 / T9.2: /v1/internal must not be reachable through the public
+  # ingress/Route, only via the ClusterIP Service (or in-cluster DNS) that
+  # resource services already use. true adds the controller-specific rule
+  # that denies it; see docs/DECISIONS.md for the per-controller mechanism.
+  blockInternalPath: true
   tls:
     enabled: false
     secretName: ""
