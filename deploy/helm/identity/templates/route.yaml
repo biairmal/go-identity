@@ -21,4 +21,32 @@ spec:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
   {{- end }}
+{{- if .Values.route.blockInternalPath }}
+---
+# TRD 9.8 / T9.2: OpenShift's Route has no "deny" annotation, so the only
+# portable way to keep /v1/internal off this public Route (see
+# docs/DECISIONS.md) is a more specific Route for that path whose backend
+# carries weight 0 and no alternateBackends; the HAProxy router answers 503
+# for it instead of forwarding to the api Service.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "identity.fullname" . }}-internal-block
+  labels:
+    {{- include "identity.labels" . | nindent 4 }}
+spec:
+  host: {{ .Values.route.host | quote }}
+  path: /v1/internal
+  to:
+    kind: Service
+    name: {{ include "identity.fullname" . }}
+    weight: 0
+  port:
+    targetPort: http
+  {{- if .Values.route.tls.enabled }}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  {{- end }}
+{{- end }}
 {{- end }}
