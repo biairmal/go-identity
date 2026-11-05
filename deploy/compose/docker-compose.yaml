@@ -44,6 +44,8 @@ services:
     env_file: .env
     environment:
       DB_HOST: postgres
+      # Where the volume below mounts; overrides the root .env.example (./keys).
+      SIGNING_KEYS_DIR: /etc/identity/keys
     volumes:
       - ./keys:/etc/identity/keys:ro
     depends_on:
@@ -57,6 +59,8 @@ services:
     env_file: .env
     environment:
       DB_HOST: postgres
+      # Where the volume below mounts; overrides the root .env.example (./keys).
+      SIGNING_KEYS_DIR: /etc/identity/keys
     volumes:
       - ./keys:/etc/identity/keys:ro
     depends_on:
