@@ -29,7 +29,6 @@ jobs:
 
   image:
     needs: check
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,12 +50,38 @@ jobs:
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - if: github.event_name == 'push'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/${{ github.repository }}:smoke
+          build-args: SERVICE_VERSION=${{ steps.vars.outputs.version }}
+      # Run the built image in the VPS Compose stack before publishing it, with
+      # the local .env defaults and a throwaway key (readable by the image's UID).
+      - name: Smoke test
+        env:
+          IMAGE_TAG: smoke
+        run: |
+          grep -v '^SERVICE_VERSION=' .env.example > deploy/compose/.env
+          echo "SUPER_ADMIN_EMAIL=admin@example.com" >> deploy/compose/.env
+          echo "SUPER_ADMIN_PASSWORD=smoke-super-admin-1" >> deploy/compose/.env
+          bash scripts/gen-dev-keys.sh deploy/compose/keys
+          chmod a+r deploy/compose/keys/*
+          docker compose -f deploy/compose/docker-compose.yaml --profile vps up -d --wait
+          got="$(curl -sk --retry 10 --retry-all-errors --retry-delay 1 https://localhost/version)"
+          echo "$got"
+          echo "$got" | grep -q '"${{ steps.vars.outputs.version }}"'
+      - name: Smoke test logs
+        if: failure()
+        run: docker compose -f deploy/compose/docker-compose.yaml --profile vps logs
+      - if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
