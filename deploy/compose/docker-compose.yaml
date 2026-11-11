@@ -26,6 +26,22 @@ services:
       timeout: 3s
       retries: 30
 
+  # Local test mailbox (default profile, so `make up` starts it). Catches the
+  # worker's mail: SMTP on localhost:1025, the inbox UI at http://localhost:8025.
+  # To send through it, run the worker on the host with these settings (in .env
+  # or the shell), not in a container, since `localhost` is this machine:
+  #   SMTP_HOST=localhost
+  #   SMTP_PORT=1025
+  #   SMTP_TLS=none
+  #   MAIL_FROM="Acme Portal <no-reply@acme.test>"
+  # Without SMTP_HOST the worker logs the mail links instead, and the facilitator
+  # hands each link to the tester.
+  # mailpit:
+  #   image: axllent/mailpit
+  #   ports:
+  #     - "1025:1025"
+  #     - "8025:8025"
+
   migrate:
     profiles: [vps]
     image: ${IMAGE:-ghcr.io/biairmal/go-identity}:${IMAGE_TAG:-latest}
