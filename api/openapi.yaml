@@ -1151,6 +1151,14 @@ paths:
         - name: to
           in: query
           schema: { type: string, format: date-time }
+        - name: target_type
+          in: query
+          description: Exact match on the target type, for example user.
+          schema: { type: string }
+        - name: target_id
+          in: query
+          description: Exact match on the target ID, any string. Needs target_type; without it the answer is 400.
+          schema: { type: string }
       responses:
         "200":
           description: A page of audit entries

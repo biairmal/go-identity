@@ -44,7 +44,9 @@ type ActorResponse struct {
 type EntryPageResponse = dto.PageResponse[EntryResponse]
 
 // auditListQuery is what GET /v1/admin/audit accepts besides page and size.
-var auditListQuery = listquery.ListParseConfig{AllowedFilterFields: []string{"actor", "action", "from", "to"}}
+var auditListQuery = listquery.ListParseConfig{AllowedFilterFields: []string{
+	"actor", "action", "from", "to", "target_type", "target_id",
+}}
 
 // listAudit answers GET /v1/admin/audit with one page of the caller's
 // tenant's log, newest first.
@@ -59,6 +61,8 @@ var auditListQuery = listquery.ListParseConfig{AllowedFilterFields: []string{"ac
 //	@Param       action query string false "Action, or a LIKE pattern"
 //	@Param       from   query string false "Earliest time, RFC 3339"
 //	@Param       to     query string false "Latest time, RFC 3339"
+//	@Param       target_type query string false "Target type, exact match, e.g. user"
+//	@Param       target_id   query string false "Target ID, exact match; needs target_type"
 //	@Security    BearerAuth
 //	@Success     200 {object} response.BaseResponse[audit.EntryPageResponse]
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid query"
@@ -118,6 +122,9 @@ func filterOf(p *listquery.ListParams) (*Filter, error) {
 		}
 		*dst = &t
 	}
+	if err := targetOf(p, f); err != nil {
+		return nil, err
+	}
 	return f, nil
 }
 
@@ -147,3 +154,22 @@ func newEntryResponse(e *Entry) *EntryResponse {
 // swag resolves the annotation types through this file's imports, and nothing
 // here returns a response value, so keep the package referenced.
 var _ response.Success
+
+// targetOf reads the exact-match target filters into f. A target ID alone is
+// ambiguous, since IDs are only unique within a type, so it needs a type.
+func targetOf(p *listquery.ListParams, f *Filter) error {
+	for field, dst := range map[string]*string{"target_type": &f.TargetType, "target_id": &f.TargetID} {
+		v, ok := p.Filters[field]
+		if !ok {
+			continue
+		}
+		if v.Operator != repository.FilterOperatorEq {
+			return badQuery(field, "takes an exact value")
+		}
+		*dst = v.Value
+	}
+	if f.TargetID != "" && f.TargetType == "" {
+		return badQuery("target_id", "needs target_type")
+	}
+	return nil
+}

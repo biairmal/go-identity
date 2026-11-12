@@ -66,6 +66,18 @@ const docTemplate = `{
                         "description": "Latest time, RFC 3339",
                         "name": "to",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target type, exact match, e.g. user",
+                        "name": "target_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target ID, exact match; needs target_type",
+                        "name": "target_id",
+                        "in": "query"
                     }
                 ],
                 "responses": {
