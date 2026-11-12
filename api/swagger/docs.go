@@ -4518,6 +4518,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_super_admin": {
+                    "type": "boolean"
+                },
                 "last_sign_in_at": {
                     "type": "string"
                 },
@@ -4584,6 +4587,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "is_super_admin": {
+                    "type": "boolean"
                 },
                 "last_sign_in_at": {
                     "type": "string"

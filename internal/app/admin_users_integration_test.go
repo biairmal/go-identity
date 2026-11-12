@@ -58,6 +58,19 @@ func TestAdminUsersList(t *testing.T) {
 	if all["total"] != float64(3) {
 		t.Fatalf("members = %v, want bia, kim and the super admin", all["total"])
 	}
+	flagged := map[string]bool{}
+	for _, it := range items(all) {
+		flag, ok := it["is_super_admin"].(bool)
+		if !ok {
+			t.Fatalf("item %v has no boolean is_super_admin", it)
+		}
+		if flag {
+			flagged[it["id"].(string)] = true
+		}
+	}
+	if len(flagged) != 1 || !flagged[f.superID(t)] {
+		t.Errorf("super admin flags = %v, want only the super admin %s", flagged, f.superID(t))
+	}
 	for _, it := range items(all) {
 		if it["display_name"] != "Kim" {
 			continue
@@ -107,6 +120,13 @@ func TestAdminUserGet(t *testing.T) {
 	if r.Status != http.StatusOK || providers["password"] != true || providers["google"] != false ||
 		r.Data["version"] == nil || r.Data["email"] != "kim@example.com" {
 		t.Fatalf("GET user = %d %s", r.Status, r.Raw)
+	}
+	if r.Data["is_super_admin"] != false {
+		t.Errorf("Kim is_super_admin = %v, want false", r.Data["is_super_admin"])
+	}
+	sup := f.do(t, http.MethodGet, "/v1/admin/users/"+f.superID(t), f.bia, nil, "")
+	if sup.Status != http.StatusOK || sup.Data["is_super_admin"] != true {
+		t.Errorf("super admin detail = %d %s, want is_super_admin true", sup.Status, sup.Raw)
 	}
 	for _, id := range []string{"00000000-0000-0000-0000-000000000001", "not-a-uuid"} {
 		if r := f.do(t, http.MethodGet, "/v1/admin/users/"+id, f.bia, nil, ""); r.Status != http.StatusNotFound {
