@@ -373,3 +373,44 @@ func TestAdminLastAdmin(t *testing.T) {
 		t.Errorf("drop roles:manage with another holder = %d %s, want 200", r.Status, r.Raw)
 	}
 }
+
+// TestAdminRoleReadsAcceptUsersManage checks that users:manage alone opens the
+// two role reads and no role write, and that users:read alone opens neither.
+func TestAdminRoleReadsAcceptUsersManage(t *testing.T) {
+	f := newAdminFixture(t)
+	f.registerAs(t, "lee@example.com", "Lee")
+	inviters := f.createRole(t, f.bia, "Inviters", "users:manage")
+	readers := f.createRole(t, f.bia, "Readers", "users:read")
+	f.exec(t, `INSERT INTO user_roles (tenant_id, user_id, role_id)
+		SELECT tenant_id, $1::uuid, id FROM roles WHERE id = $2::uuid`, f.userID(t, "Kim"), inviters)
+	f.exec(t, `INSERT INTO user_roles (tenant_id, user_id, role_id)
+		SELECT tenant_id, $1::uuid, id FROM roles WHERE id = $2::uuid`, f.userID(t, "Lee"), readers)
+	kim, lee := f.token(t, "kim@example.com"), f.token(t, "lee@example.com")
+
+	reads := []string{"/v1/admin/roles", "/v1/admin/roles/" + readers}
+	for _, p := range reads {
+		if r := f.do(t, http.MethodGet, p, kim, nil, ""); r.Status != http.StatusOK {
+			t.Errorf("users:manage GET %s = %d %s, want 200", p, r.Status, r.Raw)
+		}
+		if r := f.do(t, http.MethodGet, p, lee, nil, ""); r.Status != http.StatusForbidden {
+			t.Errorf("users:read GET %s = %d, want 403", p, r.Status)
+		}
+	}
+	if r := f.do(t, http.MethodGet, reads[1], kim, nil, ""); r.Data["permissions"] == nil {
+		t.Errorf("users:manage GET role omits permissions: %s", r.Raw)
+	}
+
+	writes := []struct{ method, path string }{
+		{http.MethodPost, "/v1/admin/roles"},
+		{http.MethodPatch, "/v1/admin/roles/" + readers},
+		{http.MethodDelete, "/v1/admin/roles/" + readers},
+		{http.MethodPut, "/v1/admin/roles/" + readers + "/permissions"},
+		{http.MethodGet, "/v1/admin/permissions"},
+	}
+	for _, w := range writes {
+		body := map[string]any{"name": "X", "permissions": []string{}}
+		if r := f.do(t, w.method, w.path, kim, body, `"1"`); r.Status != http.StatusForbidden {
+			t.Errorf("users:manage %s %s = %d %s, want 403", w.method, w.path, r.Status, r.Raw)
+		}
+	}
+}
