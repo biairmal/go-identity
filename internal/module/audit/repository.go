@@ -71,8 +71,11 @@ type Filter struct {
 	Action string
 	From   *time.Time
 	To     *time.Time
-	Limit  int
-	Offset int
+	// TargetType and TargetID match exactly; TargetID is used only with a TargetType.
+	TargetType string
+	TargetID   string
+	Limit      int
+	Offset     int
 }
 
 // entryFrom selects one tenant's entries. It joins users, owned by the user
@@ -85,13 +88,15 @@ const entryFrom = `
 	  AND ($2::uuid IS NULL OR a.actor_id = $2)
 	  AND ($3 = '' OR a.action LIKE $3)
 	  AND ($4::timestamptz IS NULL OR a.at >= $4)
-	  AND ($5::timestamptz IS NULL OR a.at <= $5)`
+	  AND ($5::timestamptz IS NULL OR a.at <= $5)
+	  AND ($6 = '' OR a.target_type = $6)
+	  AND ($7 = '' OR a.target_id = $7)`
 
 // List returns one page of a tenant's entries, newest first, and the total
 // matching.
 func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, f *Filter) ([]Entry, int64, error) {
 	conn := database.Leader(ctx, r.db)
-	args := []any{tenantID, f.ActorID, f.Action, f.From, f.To}
+	args := []any{tenantID, f.ActorID, f.Action, f.From, f.To, f.TargetType, f.TargetID}
 	var total int64
 	if err := conn.QueryRowContext(ctx, `SELECT count(*)`+entryFrom, args...).Scan(&total); err != nil {
 		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("audit: count")
@@ -99,7 +104,7 @@ func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, f *Filter) ([
 	rows, err := conn.QueryContext(ctx,
 		`SELECT a.id, a.at, a.actor_id, u.display_name, a.action, a.target_type, a.target_id,
 		        a.before, a.after, host(a.ip), a.request_id`+entryFrom+`
-		 ORDER BY a.at DESC, a.id DESC LIMIT $6 OFFSET $7`, append(args, f.Limit, f.Offset)...)
+		 ORDER BY a.at DESC, a.id DESC LIMIT $8 OFFSET $9`, append(args, f.Limit, f.Offset)...)
 	if err != nil {
 		return nil, 0, errorz.Wrap(err).WithCode(errorz.CodeInternal).WithMessage("audit: list")
 	}

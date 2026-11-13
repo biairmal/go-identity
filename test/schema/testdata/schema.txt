@@ -156,6 +156,7 @@ users users_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::
 CREATE INDEX audit_log_actor_at ON identity.audit_log USING btree (actor_id, at DESC)
 CREATE UNIQUE INDEX audit_log_pkey ON identity.audit_log USING btree (id)
 CREATE INDEX audit_log_tenant_at ON identity.audit_log USING btree (tenant_id, at DESC)
+CREATE INDEX audit_log_tenant_target_at ON identity.audit_log USING btree (tenant_id, target_type, target_id, at DESC)
 CREATE UNIQUE INDEX credentials_pkey ON identity.credentials USING btree (user_id)
 CREATE UNIQUE INDEX identities_pkey ON identity.identities USING btree (id)
 CREATE UNIQUE INDEX identities_provider_provider_subject_key ON identity.identities USING btree (provider, provider_subject)
