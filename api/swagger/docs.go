@@ -131,7 +131,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing roles:manage",
+                        "description": "Holds neither roles:manage nor users:manage",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -421,7 +421,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "One page of the tenant's roles, ordered by name.",
+                "description": "One page of the tenant's roles, ordered by name. Requires roles:manage or users:manage.",
                 "produces": [
                     "application/json"
                 ],
@@ -469,7 +469,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing roles:manage",
+                        "description": "Holds neither roles:manage nor users:manage",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -557,7 +557,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "One of the tenant's roles with its permissions and version.",
+                "description": "One of the tenant's roles with its permissions and version. Requires roles:manage or users:manage.",
                 "produces": [
                     "application/json"
                 ],
@@ -588,7 +588,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing roles:manage",
+                        "description": "Holds neither roles:manage nor users:manage",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -1697,7 +1697,7 @@ const docTemplate = `{
         },
         "/v1/auth/config": {
             "get": {
-                "description": "Enabled providers, registration and tenancy mode for the sign-in screen.",
+                "description": "Enabled providers, registration, tenancy mode and password length rules for the sign-in screen.",
                 "produces": [
                     "application/json"
                 ],
@@ -3252,6 +3252,14 @@ const docTemplate = `{
         "auth.AuthConfigResponse": {
             "type": "object",
             "properties": {
+                "password": {
+                    "description": "Password carries the length rules so the sign-up form shows live rules\nfrom the server instead of a copy of the constant.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/auth.PasswordRulesResponse"
+                        }
+                    ]
+                },
                 "providers": {
                     "$ref": "#/definitions/auth.ProvidersResponse"
                 },
@@ -3415,6 +3423,17 @@ const docTemplate = `{
                 },
                 "tenant": {
                     "$ref": "#/definitions/auth.TenantSummaryResponse"
+                }
+            }
+        },
+        "auth.PasswordRulesResponse": {
+            "type": "object",
+            "properties": {
+                "max_length": {
+                    "type": "integer"
+                },
+                "min_length": {
+                    "type": "integer"
                 }
             }
         },
