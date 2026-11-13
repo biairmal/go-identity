@@ -945,7 +945,7 @@ paths:
     get:
       tags: [admin]
       summary: List roles
-      description: Requires roles:manage.
+      description: Requires roles:manage or users:manage.
       operationId: listRoles
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1012,7 +1012,7 @@ paths:
     get:
       tags: [admin]
       summary: One role
-      description: Requires roles:manage.
+      description: Requires roles:manage or users:manage.
       operationId: getRole
       parameters:
         - $ref: "#/components/parameters/PathID"

@@ -39,16 +39,18 @@ func (m *Module) Service() *Service { return m.svc }
 func (m *Module) Authorizer() *Authorizer { return m.svc.az }
 
 // Register mounts the admin role and permission endpoints, behind
-// roles:manage, user role assignment, behind users:manage, and the internal
+// roles:manage (the two role reads also accept users:manage, so an inviter can
+// pick roles), user role assignment, behind users:manage, and the internal
 // role map, behind the service-token scope.
 func (m *Module) Register(rt *httpx.Routes) {
 	rt.Admin.With(middleware.RequirePermission(m.svc.az, PermUsersManage)).
 		Put("/users/{id}/roles", httpx.Handle(m.setUserRoles))
 	g := rt.Admin.With(middleware.RequirePermission(m.svc.az, PermRolesManage))
 	g.Get("/permissions", httpx.Handle(m.listPermissions))
-	g.Get("/roles", httpx.Handle(m.listRoles))
+	readers := rt.Admin.With(middleware.RequireAny(m.svc.az, PermRolesManage, PermUsersManage))
+	readers.Get("/roles", httpx.Handle(m.listRoles))
+	readers.Get("/roles/{id}", httpx.Handle(m.getRole))
 	g.Post("/roles", httpx.Handle(m.createRole))
-	g.Get("/roles/{id}", httpx.Handle(m.getRole))
 	g.Patch("/roles/{id}", httpx.Handle(m.updateRole))
 	g.Delete("/roles/{id}", httpx.Handle(m.deleteRole))
 	g.Put("/roles/{id}/permissions", httpx.Handle(m.setPermissions))

@@ -131,7 +131,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing roles:manage",
+                        "description": "Holds neither roles:manage nor users:manage",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -421,7 +421,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "One page of the tenant's roles, ordered by name.",
+                "description": "One page of the tenant's roles, ordered by name. Requires roles:manage or users:manage.",
                 "produces": [
                     "application/json"
                 ],
@@ -469,7 +469,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing roles:manage",
+                        "description": "Holds neither roles:manage nor users:manage",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
@@ -557,7 +557,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "One of the tenant's roles with its permissions and version.",
+                "description": "One of the tenant's roles with its permissions and version. Requires roles:manage or users:manage.",
                 "produces": [
                     "application/json"
                 ],
@@ -588,7 +588,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Missing roles:manage",
+                        "description": "Holds neither roles:manage nor users:manage",
                         "schema": {
                             "$ref": "#/definitions/response.BaseResponse-any"
                         }
