@@ -1,6 +1,10 @@
 package auth
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+
+	"github.com/biairmal/go-identity/internal/module/auth/password"
+)
 
 // AuthConfigResponse is what the sign-in screen needs to render itself: the
 // enabled providers, whether self sign-up is open and the tenancy mode. It is
@@ -11,6 +15,16 @@ type AuthConfigResponse struct {
 	Providers    ProvidersResponse `json:"providers"`
 	Registration bool              `json:"registration"`
 	Tenancy      string            `json:"tenancy"`
+	// Password carries the length rules so the sign-up form shows live rules
+	// from the server instead of a copy of the constant.
+	Password PasswordRulesResponse `json:"password"`
+}
+
+// PasswordRulesResponse is the password length range, in runes. It is always
+// present, also when the password provider is off.
+type PasswordRulesResponse struct {
+	MinLength int `json:"min_length"`
+	MaxLength int `json:"max_length"`
 }
 
 // ProvidersResponse reports which sign-in providers are enabled.
@@ -29,6 +43,10 @@ func newAuthConfigResponse(cfg *Config, tenancy string) AuthConfigResponse {
 		},
 		Registration: cfg.Registration.Enabled,
 		Tenancy:      tenancy,
+		Password: PasswordRulesResponse{
+			MinLength: cfg.Providers.Password.MinLength,
+			MaxLength: password.MaxRunes,
+		},
 	}
 }
 

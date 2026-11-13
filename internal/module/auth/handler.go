@@ -34,7 +34,7 @@ const switchTenantPath = "/auth/switch-tenant"
 // life of the process, so the response is built once in New.
 //
 //	@Summary     Sign-in settings
-//	@Description Enabled providers, registration and tenancy mode for the sign-in screen.
+//	@Description Enabled providers, registration, tenancy mode and password length rules for the sign-in screen.
 //	@Tags        auth
 //	@Produce     json
 //	@Success     200 {object} response.BaseResponse[auth.AuthConfigResponse]
