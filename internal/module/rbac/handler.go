@@ -33,7 +33,7 @@ func roleID(r *http.Request) (uuid.UUID, error) {
 //	@Security    BearerAuth
 //	@Success     200 {object} response.BaseResponse[[]rbac.PermissionResponse]
 //	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
-//	@Failure     403 {object} response.BaseResponse[any] "Missing roles:manage"
+//	@Failure     403 {object} response.BaseResponse[any] "Holds neither roles:manage nor users:manage"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/admin/permissions [get]
 func (m *Module) listPermissions(r *http.Request) (any, error) {
@@ -79,7 +79,7 @@ func (m *Module) getInternalRolePermissions(r *http.Request) (any, error) {
 // listRoles answers GET /v1/admin/roles with one page of the tenant's roles.
 //
 //	@Summary     List roles
-//	@Description One page of the tenant's roles, ordered by name.
+//	@Description One page of the tenant's roles, ordered by name. Requires roles:manage or users:manage.
 //	@Tags        admin
 //	@Produce     json
 //	@Param       page   query int    false "Page, 1-based"
@@ -89,7 +89,7 @@ func (m *Module) getInternalRolePermissions(r *http.Request) (any, error) {
 //	@Success     200 {object} response.BaseResponse[rbac.RolePageResponse]
 //	@Failure     400 {object} response.BaseResponse[any] "Invalid query"
 //	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
-//	@Failure     403 {object} response.BaseResponse[any] "Missing roles:manage"
+//	@Failure     403 {object} response.BaseResponse[any] "Holds neither roles:manage nor users:manage"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/admin/roles [get]
 func (m *Module) listRoles(r *http.Request) (any, error) {
@@ -132,14 +132,14 @@ func (m *Module) createRole(r *http.Request) (any, error) {
 // getRole answers GET /v1/admin/roles/{id}.
 //
 //	@Summary     Get a role
-//	@Description One of the tenant's roles with its permissions and version.
+//	@Description One of the tenant's roles with its permissions and version. Requires roles:manage or users:manage.
 //	@Tags        admin
 //	@Produce     json
 //	@Param       id path string true "Role ID"
 //	@Security    BearerAuth
 //	@Success     200 {object} response.BaseResponse[rbac.RoleResponse]
 //	@Failure     401 {object} response.BaseResponse[any] "Missing, invalid or expired token"
-//	@Failure     403 {object} response.BaseResponse[any] "Missing roles:manage"
+//	@Failure     403 {object} response.BaseResponse[any] "Holds neither roles:manage nor users:manage"
 //	@Failure     404 {object} response.BaseResponse[any] "Role not found"
 //	@Failure     500 {object} response.BaseResponse[any] "Internal error"
 //	@Router      /v1/admin/roles/{id} [get]

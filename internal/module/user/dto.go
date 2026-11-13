@@ -29,6 +29,7 @@ type AdminUserResponse struct {
 	DisplayName      string            `json:"display_name"`
 	Status           string            `json:"status"`
 	MembershipStatus string            `json:"membership_status"`
+	IsSuperAdmin     bool              `json:"is_super_admin"`
 	Roles            []RoleRefResponse `json:"roles"`
 	CreatedAt        time.Time         `json:"created_at"`
 	LastSignInAt     *time.Time        `json:"last_sign_in_at"`
@@ -65,7 +66,8 @@ func newAdminUserResponse(m *Member, roles []RoleRef) *AdminUserResponse {
 	}
 	return &AdminUserResponse{
 		ID: m.ID.String(), Email: m.Email, DisplayName: m.DisplayName, Status: m.Status,
-		MembershipStatus: m.MembershipStatus, Roles: refs, CreatedAt: m.CreatedAt.UTC(), LastSignInAt: utc(m.LastSignInAt),
+		MembershipStatus: m.MembershipStatus, IsSuperAdmin: m.IsSuperAdmin, Roles: refs,
+		CreatedAt: m.CreatedAt.UTC(), LastSignInAt: utc(m.LastSignInAt),
 	}
 }
 

@@ -30,6 +30,7 @@ func getAuthConfigRaw(t *testing.T, m *Module) map[string]any {
 }
 
 func TestAuthConfigReflectsConfig(t *testing.T) {
+	defaultRules := PasswordRulesResponse{MinLength: 10, MaxLength: 128}
 	tests := []struct {
 		name    string
 		mutate  func(c *Config)
@@ -40,7 +41,7 @@ func TestAuthConfigReflectsConfig(t *testing.T) {
 			name:    "defaults",
 			mutate:  func(*Config) {},
 			tenancy: "single",
-			want:    AuthConfigResponse{ProvidersResponse{Password: true}, true, "single"},
+			want:    AuthConfigResponse{ProvidersResponse{Password: true}, true, "single", defaultRules},
 		},
 		{
 			name: "google enabled",
@@ -48,7 +49,7 @@ func TestAuthConfigReflectsConfig(t *testing.T) {
 				c.Providers.Google = GoogleProviderConfig{Enabled: true, ClientID: "cid", ClientSecret: "csecret"}
 			},
 			tenancy: "single",
-			want:    AuthConfigResponse{ProvidersResponse{Password: true, Google: true}, true, "single"},
+			want:    AuthConfigResponse{ProvidersResponse{Password: true, Google: true}, true, "single", defaultRules},
 		},
 		{
 			name: "google only",
@@ -57,19 +58,27 @@ func TestAuthConfigReflectsConfig(t *testing.T) {
 				c.Providers.Google = GoogleProviderConfig{Enabled: true, ClientID: "cid", ClientSecret: "csecret"}
 			},
 			tenancy: "single",
-			want:    AuthConfigResponse{ProvidersResponse{Google: true}, true, "single"},
+			want:    AuthConfigResponse{ProvidersResponse{Google: true}, true, "single", defaultRules},
 		},
 		{
 			name:    "registration off",
 			mutate:  func(c *Config) { c.Registration.Enabled = false },
 			tenancy: "single",
-			want:    AuthConfigResponse{ProvidersResponse{Password: true}, false, "single"},
+			want:    AuthConfigResponse{ProvidersResponse{Password: true}, false, "single", defaultRules},
+		},
+		{
+			name:    "configured minimum",
+			mutate:  func(c *Config) { c.Providers.Password.MinLength = 12 },
+			tenancy: "single",
+			want: AuthConfigResponse{
+				ProvidersResponse{Password: true}, true, "single", PasswordRulesResponse{MinLength: 12, MaxLength: 128},
+			},
 		},
 		{
 			name:    "multi tenancy",
 			mutate:  func(*Config) {},
 			tenancy: "multi",
-			want:    AuthConfigResponse{ProvidersResponse{Password: true}, true, "multi"},
+			want:    AuthConfigResponse{ProvidersResponse{Password: true}, true, "multi", defaultRules},
 		},
 	}
 	for _, tt := range tests {
@@ -113,12 +122,20 @@ func TestAuthConfigHasNoSecret(t *testing.T) {
 	}
 	data := getAuthConfigRaw(t, m)
 
-	if got, want := sortedKeys(data), []string{"providers", "registration", "tenancy"}; !slices.Equal(got, want) {
+	want := []string{"password", "providers", "registration", "tenancy"}
+	if got := sortedKeys(data); !slices.Equal(got, want) {
 		t.Errorf("keys = %v, want %v", got, want)
 	}
 	providers, ok := data["providers"].(map[string]any)
 	if !ok {
 		t.Fatalf("providers = %T, want object", data["providers"])
+	}
+	pw, ok := data["password"].(map[string]any)
+	if !ok {
+		t.Fatalf("password = %T, want object", data["password"])
+	}
+	if got, want := sortedKeys(pw), []string{"max_length", "min_length"}; !slices.Equal(got, want) {
+		t.Errorf("password keys = %v, want %v", got, want)
 	}
 	if got, want := sortedKeys(providers), []string{"google", "password"}; !slices.Equal(got, want) {
 		t.Errorf("providers keys = %v, want %v", got, want)
@@ -183,6 +200,10 @@ func checkSchema(t *testing.T, where string, s *openAPISchema, value any) {
 			if v, ok := obj[name]; ok {
 				checkSchema(t, where+"."+name, &prop, v)
 			}
+		}
+	case "integer":
+		if n, ok := value.(float64); !ok || n != float64(int(n)) {
+			t.Errorf("%s = %v, want integer", where, value)
 		}
 	case "boolean":
 		if _, ok := value.(bool); !ok {
@@ -250,7 +271,7 @@ func TestAuthConfigResponseFields(t *testing.T) {
 	for i := range typ.NumField() {
 		got = append(got, typ.Field(i).Tag.Get("json"))
 	}
-	if want := []string{"providers", "registration", "tenancy"}; !slices.Equal(got, want) {
+	if want := []string{"providers", "registration", "tenancy", "password"}; !slices.Equal(got, want) {
 		t.Errorf("AuthConfigResponse json fields = %v, want %v", got, want)
 	}
 }

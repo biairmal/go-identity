@@ -37,6 +37,10 @@ func TestAuthConfigIsPublic(t *testing.T) {
 		} `json:"providers"`
 		Registration bool   `json:"registration"`
 		Tenancy      string `json:"tenancy"`
+		Password     struct {
+			MinLength int `json:"min_length"`
+			MaxLength int `json:"max_length"`
+		} `json:"password"`
 	}
 	r := testkit.Do[body](t, srv, http.MethodGet, "/v1/auth/config", nil, nil)
 	if r.Status != http.StatusOK {
@@ -46,6 +50,9 @@ func TestAuthConfigIsPublic(t *testing.T) {
 		t.Errorf("data = %+v, want password only, registration on, multi tenancy", r.Data)
 	}
 
+	if r.Data.Password.MinLength != 10 || r.Data.Password.MaxLength != 128 {
+		t.Errorf("password rules = %+v, want 10 and 128", r.Data.Password)
+	}
 	if s := testkit.Do[any](t, srv, http.MethodGet, "/v1/me", nil, nil).Status; s != http.StatusUnauthorized {
 		t.Errorf("GET /v1/me without a token = %d, want 401 (auth must be active)", s)
 	}

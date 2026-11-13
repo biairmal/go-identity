@@ -945,7 +945,7 @@ paths:
     get:
       tags: [admin]
       summary: List roles
-      description: Requires roles:manage.
+      description: Requires roles:manage or users:manage.
       operationId: listRoles
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1012,7 +1012,7 @@ paths:
     get:
       tags: [admin]
       summary: One role
-      description: Requires roles:manage.
+      description: Requires roles:manage or users:manage.
       operationId: getRole
       parameters:
         - $ref: "#/components/parameters/PathID"
@@ -1744,7 +1744,7 @@ components:
 
     AuthConfig:
       type: object
-      required: [providers, registration, tenancy]
+      required: [providers, registration, tenancy, password]
       properties:
         providers:
           type: object
@@ -1756,6 +1756,21 @@ components:
           type: boolean
           description: False means invite-only; the sign-up screen should 404.
         tenancy: { type: string, enum: [single, multi] }
+        password:
+          type: object
+          description: |
+            Password length rules in characters (runes). Always present, also when
+            password sign-in is off. The minimum is configurable (floor 10); the
+            maximum is the policy cap.
+          required: [min_length, max_length]
+          properties:
+            min_length: { type: integer, example: 10 }
+            max_length: { type: integer, example: 128 }
+      example:
+        providers: { password: true, google: false }
+        registration: true
+        tenancy: single
+        password: { min_length: 10, max_length: 128 }
 
     RegisterRequest:
       type: object
@@ -1904,13 +1919,16 @@ components:
 
     AdminUser:
       type: object
-      required: [id, email, display_name, status, membership_status, roles, created_at]
+      required: [id, email, display_name, status, membership_status, is_super_admin, roles, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
         display_name: { type: string }
         status: { type: string, enum: [pending, active, disabled] }
         membership_status: { type: string, enum: [invited, active, disabled, removed] }
+        is_super_admin:
+          type: boolean
+          description: True for the platform super admin, who cannot be disabled, removed or given other roles.
         roles:
           type: array
           items: { $ref: "#/components/schemas/RoleRef" }
