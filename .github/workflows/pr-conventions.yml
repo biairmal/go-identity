@@ -1,0 +1,39 @@
+name: pr-conventions
+
+# Squash merges make the PR title the commit on main, so the title, the branch name and the
+# body's required sections are checked here. Rules: AGENTS.md "Git conventions".
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  conventions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title, branch and body
+        # Passed through env, never interpolated into the script, so PR text cannot run as code.
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          case "$BRANCH" in renovate/*|dependabot/*) echo "bot branch, skipped"; exit 0 ;; esac
+          types='feat|fix|refactor|perf|test|docs|build|ci|chore|revert'
+          fail=0
+          if ! grep -Eq "^($types)(\([a-z0-9-]+\))?!?: [^ ]" <<<"$TITLE"; then
+            echo "::error::Title must be '<type>(<scope>)?: <what it does> (<task id>)', e.g. 'feat(auth): lock the account after 5 failures (T3.6)'. Got: $TITLE"
+            fail=1
+          fi
+          if ! grep -Eq "^($types)/[A-Za-z0-9._/-]+$" <<<"$BRANCH"; then
+            echo "::error::Branch must be '<type>/<group>/<task-id>-<slug>', e.g. 'feat/p2/T3.6-login'. Got: $BRANCH"
+            fail=1
+          fi
+          for section in '### Why' '### What changed' '### Verification'; do
+            if ! grep -q "^$section" <<<"$BODY"; then
+              echo "::error::Body is missing the '$section' section from .github/pull_request_template.md"
+              fail=1
+            fi
+          done
+          exit $fail
