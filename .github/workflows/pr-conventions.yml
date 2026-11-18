@@ -1,7 +1,7 @@
 name: pr-conventions
 
 # Squash merges make the PR title the commit on main, so the title, the branch name and the
-# body's required sections are checked here. Rules: AGENTS.md "Git conventions".
+# body's required sections are checked here. Rules: CONTRIBUTING.md "Git conventions".
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
