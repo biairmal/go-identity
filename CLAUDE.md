@@ -1,4 +1,8 @@
 # CLAUDE.md
 
-The development guidelines for this repository live in **[AGENTS.md](./AGENTS.md)**. Read it before making any
-change. This file holds no rules of its own so the two never drift.
+The guidelines for this repository live in [AGENTS.md](./AGENTS.md) (code rules) and
+[CONTRIBUTING.md](./CONTRIBUTING.md) (git conventions, PR, Definition of Done). Both are imported below so they are
+always loaded. This file holds no rules of its own so they never drift.
+
+@AGENTS.md
+@CONTRIBUTING.md
