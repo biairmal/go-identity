@@ -6,15 +6,18 @@ import (
 	"time"
 
 	"github.com/biairmal/go-sdk/lib/logger"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/platform/database"
+	"github.com/biairmal/go-identity/internal/platform/tracing"
 )
 
 // Service holds the user rules. It knows nothing about HTTP, and it only ever
 // sees plain emails: the repository encrypts and decrypts around the database.
 type Service struct {
 	cfg   Config
+	tr    tracer.Tracer
 	repo  *Repository
 	creds *CredentialsRepository
 	log   logger.Logger
@@ -25,7 +28,7 @@ func NewService(cfg Config, repo *Repository, creds *CredentialsRepository, log 
 	if log == nil {
 		log = logger.NewNoOp()
 	}
-	return &Service{cfg: cfg, repo: repo, creds: creds, log: log}
+	return &Service{cfg: cfg, tr: tracer.NewNoOp(), repo: repo, creds: creds, log: log}
 }
 
 // Create stores a user and, when passwordHash is not empty, its credentials
@@ -50,7 +53,10 @@ func (s *Service) Create(ctx context.Context, p *CreateParams, passwordHash stri
 }
 
 // Get returns one user.
-func (s *Service) Get(ctx context.Context, id uuid.UUID) (*User, error) {
+func (s *Service) Get(ctx context.Context, id uuid.UUID) (_ *User, err error) {
+	ctx, span := s.tr.Start(ctx, "user.Get", tracer.WithAttributes(map[string]any{"user.id": id.String()}))
+	defer func() { tracing.End(span, err) }()
+
 	return s.repo.Get(ctx, id)
 }
 

@@ -6,15 +6,18 @@ import (
 
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/logger"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/platform/scope"
+	"github.com/biairmal/go-identity/internal/platform/tracing"
 )
 
 // Service holds the RBAC rules. It knows nothing about HTTP.
 type Service struct {
 	cfg   Config
+	tr    tracer.Tracer
 	repo  *Repository
 	audit AuditWriter
 	log   logger.Logger
@@ -29,7 +32,7 @@ func NewService(cfg Config, repo *Repository, auditWriter AuditWriter, log logge
 	if log == nil {
 		log = logger.NewNoOp()
 	}
-	return &Service{cfg: cfg, repo: repo, audit: auditWriter, log: log, az: &Authorizer{repo: repo}}
+	return &Service{cfg: cfg, tr: tracer.NewNoOp(), repo: repo, audit: auditWriter, log: log, az: &Authorizer{repo: repo}}
 }
 
 // EffectivePermissions is the union of the permissions of every role the user
@@ -50,8 +53,17 @@ func (s *Service) RoleNames(ctx context.Context, tenantID, userID uuid.UUID) ([]
 
 // TenantRoleMap is the role to permissions map of one tenant, served to
 // resource services through /v1/internal so their authz keeps tokens small.
-func (s *Service) TenantRoleMap(ctx context.Context, tenantID uuid.UUID) (map[string][]string, error) {
-	return s.repo.TenantRoleMap(ctx, tenantID)
+func (s *Service) TenantRoleMap(ctx context.Context, tenantID uuid.UUID) (_ map[string][]string, err error) {
+	ctx, span := s.tr.Start(ctx, "rbac.TenantRoleMap",
+		tracer.WithAttributes(map[string]any{"tenant.id": tenantID.String()}))
+	defer func() { tracing.End(span, err) }()
+
+	roles, err := s.repo.TenantRoleMap(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	span.SetAttributes(map[string]any{"rbac.role_count": len(roles)})
+	return roles, nil
 }
 
 // Permissions lists the catalog an admin composes roles from.

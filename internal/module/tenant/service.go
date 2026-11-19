@@ -8,17 +8,20 @@ import (
 	"github.com/biairmal/go-sdk/lib/common/dto"
 	"github.com/biairmal/go-sdk/lib/errorz"
 	"github.com/biairmal/go-sdk/lib/logger"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 	"github.com/google/uuid"
 
 	"github.com/biairmal/go-identity/internal/platform/apierr"
 	"github.com/biairmal/go-identity/internal/platform/database"
 	"github.com/biairmal/go-identity/internal/platform/scope"
+	"github.com/biairmal/go-identity/internal/platform/tracing"
 )
 
 // Service holds the tenant rules. It knows nothing about HTTP.
 type Service struct {
 	cfg   Config
+	tr    tracer.Tracer
 	repo  *Repository
 	audit AuditWriter
 	log   logger.Logger
@@ -40,7 +43,7 @@ func NewService(cfg Config, repo *Repository, auditWriter AuditWriter, log logge
 	if log == nil {
 		log = logger.NewNoOp()
 	}
-	return &Service{cfg: cfg, repo: repo, audit: auditWriter, log: log}
+	return &Service{cfg: cfg, tr: tracer.NewNoOp(), repo: repo, audit: auditWriter, log: log}
 }
 
 // EnsureDefault creates the configured default tenant if it is missing and
@@ -134,7 +137,10 @@ func (s *Service) GetTenant(ctx context.Context, id uuid.UUID) (*TenantResponse,
 // InternalTenant returns one tenant for GET /v1/internal/tenants/{id} (TRD
 // 9.8): the minimal shape a resource service needs, with no member count or
 // version.
-func (s *Service) InternalTenant(ctx context.Context, id uuid.UUID) (*InternalTenantResponse, error) {
+func (s *Service) InternalTenant(ctx context.Context, id uuid.UUID) (_ *InternalTenantResponse, err error) {
+	ctx, span := s.tr.Start(ctx, "tenant.InternalTenant", tracer.WithAttributes(map[string]any{"tenant.id": id.String()}))
+	defer func() { tracing.End(span, err) }()
+
 	t, err := s.repo.ByID(ctx, id)
 	if err != nil {
 		return nil, err

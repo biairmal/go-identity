@@ -5,6 +5,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/httpkit/middleware"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
+	"github.com/biairmal/go-sdk/lib/tracer"
 
 	"github.com/biairmal/go-identity/internal/platform/clock"
 	"github.com/biairmal/go-identity/internal/platform/httpx"
@@ -33,14 +34,20 @@ type Deps struct {
 	// Roles and Authz serve the admin routes; the CLI leaves them nil.
 	Roles Roles
 	Authz authz.Authorizer
+	// Tracer starts spans; nil means none.
+	Tracer tracer.Tracer
 }
 
 // New builds the module from its config block and dependencies.
 func New(cfg Config, deps *Deps) *Module {
 	repo := NewRepository(deps.DB, deps.EmailCipher)
 	creds := NewCredentialsRepository(deps.DB)
+	svc := NewService(cfg, repo, creds, deps.Log)
+	if deps.Tracer != nil {
+		svc.tr = deps.Tracer
+	}
 	return &Module{
-		svc: NewService(cfg, repo, creds, deps.Log),
+		svc: svc,
 		admins: NewSuperAdmins(cfg.SuperAdmin, deps.DB, repo, creds, &SuperAdminDeps{
 			Passwords:   deps.Passwords,
 			Memberships: deps.Memberships,

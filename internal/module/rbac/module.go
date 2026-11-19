@@ -4,6 +4,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/httpkit/middleware"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 
 	"github.com/biairmal/go-identity/internal/platform/httpx"
@@ -21,12 +22,17 @@ type Deps struct {
 	Log   logger.Logger
 	V     validator.Validator
 	Audit AuditWriter
+	// Tracer starts spans; nil means none.
+	Tracer tracer.Tracer
 }
 
 // New builds the module from its config block and dependencies.
 func New(cfg Config, deps Deps) *Module {
 	svc := NewService(cfg, NewRepository(deps.DB), deps.Audit, deps.Log)
 	svc.v = deps.V
+	if deps.Tracer != nil {
+		svc.tr = deps.Tracer
+	}
 	return &Module{svc: svc}
 }
 

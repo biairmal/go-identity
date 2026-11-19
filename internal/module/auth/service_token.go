@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"github.com/biairmal/go-sdk/lib/errorz"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 
 	"github.com/biairmal/go-identity/internal/module/auth/password"
 	"github.com/biairmal/go-identity/internal/module/auth/token"
 	"github.com/biairmal/go-identity/internal/platform/apierr"
+	"github.com/biairmal/go-identity/internal/platform/tracing"
 )
 
 // serviceTokenTTL is how long a service token lives (TRD 9.4).
@@ -26,13 +28,17 @@ type ServiceTokens struct {
 	cfg    *Config
 	v      validator.Validator
 	tokens *token.Builder
+	tr     tracer.Tracer
 }
 
 // Issue checks grant_type and the client's credentials against
 // modules.auth.service_clients and signs a scope:internal token. An unknown
 // client_id or a wrong secret both answer INVALID_CLIENT, so neither reveals
 // which client IDs are configured.
-func (s *ServiceTokens) Issue(ctx context.Context, in *ServiceTokenRequest) (*ServiceTokenResponse, error) {
+func (s *ServiceTokens) Issue(ctx context.Context, in *ServiceTokenRequest) (_ *ServiceTokenResponse, err error) {
+	ctx, span := s.tr.Start(ctx, "auth.IssueServiceToken")
+	defer func() { tracing.End(span, err) }()
+
 	if err := s.v.ValidateStruct(in); err != nil {
 		return nil, err
 	}
