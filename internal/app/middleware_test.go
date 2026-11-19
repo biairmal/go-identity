@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func TestCORS(t *testing.T) {
@@ -43,6 +45,10 @@ func TestCORS(t *testing.T) {
 			if got := rec.Header().Get("Access-Control-Allow-Origin"); got != tt.wantAllow {
 				t.Errorf("Allow-Origin = %q, want %q", got, tt.wantAllow)
 			}
+			if expose := rec.Header().Get("Access-Control-Expose-Headers"); tt.wantAllow != "" &&
+				!strings.Contains(expose, "X-Trace-Id") {
+				t.Errorf("Expose-Headers = %q, want X-Trace-Id in it", expose)
+			}
 		})
 	}
 }
@@ -59,5 +65,30 @@ func TestMaxBody(t *testing.T) {
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", strings.NewReader("1234")))
 	if readErr != nil {
 		t.Fatalf("body within the limit failed: %v", readErr)
+	}
+}
+
+func TestRoutePattern(t *testing.T) {
+	var got string
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req)
+			got = routePattern(req) // read after routing, as middleware.Tracing does
+		})
+	})
+	r.Route("/v1", func(v1 chi.Router) { v1.Get("/users/{id}", func(http.ResponseWriter, *http.Request) {}) })
+
+	for _, tt := range []struct{ path, want string }{
+		{"/v1/users/5f0c9b2e", "/v1/users/{id}"},
+		{"/nope", ""},
+	} {
+		r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, tt.path, http.NoBody))
+		if got != tt.want {
+			t.Errorf("routePattern(%s) = %q, want %q", tt.path, got, tt.want)
+		}
+	}
+	if p := routePattern(httptest.NewRequest(http.MethodGet, "/", http.NoBody)); p != "" {
+		t.Errorf("without chi: %q, want empty", p)
 	}
 }

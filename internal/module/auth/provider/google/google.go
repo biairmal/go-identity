@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/oauth2"
 
 	"github.com/biairmal/go-identity/internal/module/auth/provider"
@@ -26,6 +28,9 @@ type Config struct {
 	ClientSecret string
 	// RedirectURL is identity's callback, registered with Google.
 	RedirectURL string
+	// HTTPClient makes every call to Google (discovery, keys, code exchange);
+	// nil uses http.DefaultClient.
+	HTTPClient *http.Client
 }
 
 // Provider is Google behind provider.Provider. Discovery runs on first use,
@@ -53,12 +58,24 @@ func (p *Provider) discover(ctx context.Context) (*oidc.Provider, error) {
 	if p.op != nil {
 		return p.op, nil
 	}
-	op, err := oidc.NewProvider(ctx, p.cfg.IssuerURL)
+	// The provider keeps this context for every later key-set fetch, so it carries
+	// the client but not the request's span: a later fetch must not join the trace
+	// of whichever sign-in happened to run discovery.
+	op, err := oidc.NewProvider(p.client(trace.ContextWithSpanContext(ctx, trace.SpanContext{})), p.cfg.IssuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("google: discovery: %w", err)
 	}
 	p.op = op
 	return op, nil
+}
+
+// client puts the configured HTTP client on ctx, where go-oidc and oauth2 look
+// for it.
+func (p *Provider) client(ctx context.Context) context.Context {
+	if p.cfg.HTTPClient == nil {
+		return ctx
+	}
+	return oidc.ClientContext(ctx, p.cfg.HTTPClient)
 }
 
 // oauth2Config is the client configuration against the discovered endpoints.
@@ -88,7 +105,7 @@ func (p *Provider) Exchange(ctx context.Context, code, verifier, nonce string) (
 	if err != nil {
 		return nil, err
 	}
-	tok, err := p.oauth2Config(op).Exchange(ctx, code, oauth2.VerifierOption(verifier))
+	tok, err := p.oauth2Config(op).Exchange(p.client(ctx), code, oauth2.VerifierOption(verifier))
 	if err != nil {
 		return nil, fmt.Errorf("google: exchange code: %w", err)
 	}

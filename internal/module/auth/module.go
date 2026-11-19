@@ -88,6 +88,8 @@ type Deps struct {
 	// Authz guards POST /v1/admin/users/invite. It may be nil when the
 	// routes are not registered.
 	Authz authz.Authorizer
+	// HTTPClient makes the calls to Google; nil uses http.DefaultClient.
+	HTTPClient *http.Client
 	// EmailCipher encrypts the address stored with a linked identity; nil
 	// stores none.
 	EmailCipher EmailEncrypter
@@ -175,6 +177,7 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 			IssuerURL: cfg.Providers.Google.IssuerURL, ClientID: cfg.Providers.Google.ClientID,
 			ClientSecret: cfg.Providers.Google.ClientSecret,
 			RedirectURL:  strings.TrimSuffix(cfg.PublicURL, "/") + "/v1" + googleCallbackPath,
+			HTTPClient:   deps.HTTPClient,
 		}),
 		states:     NewStateRepository(deps.DB),
 		identities: NewIdentityRepository(deps.DB), tx: tx, users: deps.Users, tenants: deps.Tenants,

@@ -4,6 +4,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/authz"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 
 	"github.com/biairmal/go-identity/internal/module/audit"
@@ -32,6 +33,8 @@ type Deps struct {
 	// RefreshLimiter rate-limits POST /v1/auth/refresh with its own budget;
 	// nil turns it off.
 	RefreshLimiter *ratelimit.Limiter
+	// Tracer starts spans; it is a NoOp when tracing is off.
+	Tracer tracer.Tracer
 }
 
 // Module is a feature boundary. internal/app only sees this: it builds each
@@ -107,6 +110,7 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 		Sessions:    authSessions{svc: sessionModule.Service()},
 		Audit:       authAudit{w: auditModule.Writer()},
 		Authz:       rbacModule.Authorizer(),
+		HTTPClient:  outboundClient(deps.Tracer),
 		EmailCipher: cipher,
 	}
 	if deps.Limiter != nil {
