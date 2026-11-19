@@ -1654,12 +1654,18 @@ components:
       required: [timestamp]
       properties:
         timestamp: { type: string, format: date-time }
+        trace_id:
+          type: string
+          description: The trace of this request, the same as the X-Trace-Id header. Absent when tracing is off.
 
     ErrorEnvelope:
       type: object
       required: [timestamp, error]
       properties:
         timestamp: { type: string, format: date-time }
+        trace_id:
+          type: string
+          description: The trace of this request, the same as the X-Trace-Id header. Absent when tracing is off.
         error:
           type: object
           required: [code, message]

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/biairmal/go-sdk/lib/auth"
 	"github.com/biairmal/go-sdk/lib/ctxkit"
@@ -109,7 +110,7 @@ func build(ctx context.Context, cfg *Config, log logger.Logger, db *sqlkit.DB, r
 	}
 	deps := Deps{
 		DB: db, Log: log, V: validator.New(cfg.Validator), Authz: rbac.NewAuthorizer(db),
-		Outbox: database.NewOutbox(db), Limiter: limiter, RefreshLimiter: refreshLimiter,
+		Outbox: database.NewOutbox(db), Limiter: limiter, RefreshLimiter: refreshLimiter, Tracer: tr,
 	}
 	modules, svc, err := buildModules(&a.cfg, &deps)
 	if err != nil {
@@ -134,6 +135,28 @@ func build(ctx context.Context, cfg *Config, log logger.Logger, db *sqlkit.DB, r
 	return a, nil
 }
 
+// outboundTimeout bounds every call this service makes to another one.
+const outboundTimeout = 10 * time.Second
+
+// outboundClient is the HTTP client for calls to other services (Google
+// sign-in). Its transport starts a client span per call and sends traceparent.
+func outboundClient(tr tracer.Tracer) *http.Client {
+	if tr == nil {
+		tr = tracer.NewNoOp()
+	}
+	return &http.Client{Timeout: outboundTimeout, Transport: tracer.Transport(tr, nil)}
+}
+
+// routePattern is the chi route a request matched, such as /v1/users/{id}, so
+// request spans are named by route and not by the raw path. It is empty for
+// unknown routes, which keep the raw path.
+func routePattern(r *http.Request) string {
+	if rc := chi.RouteContext(r.Context()); rc != nil {
+		return rc.RoutePattern()
+	}
+	return ""
+}
+
 // middlewareChain is the shared middleware, outermost first (TRD 3.3). The
 // auth middleware is appended after it when auth is enabled.
 func middlewareChain(
@@ -141,10 +164,10 @@ func middlewareChain(
 ) []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		middleware.Metrics(rec, nil),
-		middleware.Recover(),
+		middleware.Recover(log),
 		middleware.RequestID(),
 		middleware.Correlation(),
-		middleware.Tracing(tr),
+		middleware.Tracing(tr, middleware.WithRouteFunc(routePattern)),
 		middleware.Logging(log, &middleware.LoggingOptions{LogResponse: true}),
 		cors(cfg.HTTP.CORS),
 		maxBody(cfg.HTTP.MaxBodyBytes),

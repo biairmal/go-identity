@@ -6,6 +6,7 @@ package database
 import (
 	"database/sql"
 
+	"github.com/biairmal/go-sdk/lib/tracer/tracesql"
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -13,7 +14,10 @@ import (
 // key=value DSN for "postgres", which pgx accepts.
 const DriverName = "postgres"
 
-// Driver registration is the one init side effect the conventions allow.
+// Driver registration is the one init side effect the conventions allow. The
+// driver is traced: a statement run under a span becomes its child span, with
+// the SQL text and never the arguments. With tracing off the global OTel
+// provider is a no-op, so the wrapper costs almost nothing.
 func init() {
-	sql.Register(DriverName, stdlib.GetDefaultDriver())
+	sql.Register(DriverName, tracesql.WrapDriver(stdlib.GetDefaultDriver()))
 }
