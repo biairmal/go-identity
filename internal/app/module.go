@@ -65,17 +65,19 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 	auditModule := audit.New(audit.Deps{DB: deps.DB, Log: deps.Log, Authz: deps.Authz})
 
 	tenantModule := tenant.New(cfg.Modules.Tenant, tenant.Deps{
-		DB:    deps.DB,
-		Log:   deps.Log,
-		V:     deps.V,
-		Audit: tenantAudit{w: auditModule.Writer()},
+		DB:     deps.DB,
+		Log:    deps.Log,
+		V:      deps.V,
+		Audit:  tenantAudit{w: auditModule.Writer()},
+		Tracer: deps.Tracer,
 	})
 
 	rbacModule := rbac.New(cfg.Modules.RBAC, rbac.Deps{
-		DB:    deps.DB,
-		Log:   deps.Log,
-		V:     deps.V,
-		Audit: rbacAudit{w: auditModule.Writer()},
+		DB:     deps.DB,
+		Log:    deps.Log,
+		V:      deps.V,
+		Audit:  rbacAudit{w: auditModule.Writer()},
+		Tracer: deps.Tracer,
 	})
 
 	sessionModule := session.New(cfg.Modules.Session, &session.Deps{
@@ -111,6 +113,7 @@ func buildModules(cfg *Config, deps *Deps) ([]Module, *services, error) {
 		Audit:       authAudit{w: auditModule.Writer()},
 		Authz:       rbacModule.Authorizer(),
 		HTTPClient:  outboundClient(deps.Tracer),
+		Tracer:      deps.Tracer,
 		EmailCipher: cipher,
 	}
 	if deps.Limiter != nil {

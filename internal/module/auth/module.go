@@ -10,6 +10,7 @@ import (
 	"github.com/biairmal/go-sdk/lib/httpkit/middleware"
 	"github.com/biairmal/go-sdk/lib/logger"
 	"github.com/biairmal/go-sdk/lib/sqlkit"
+	"github.com/biairmal/go-sdk/lib/tracer"
 	"github.com/biairmal/go-sdk/lib/validator"
 	"github.com/google/uuid"
 
@@ -90,6 +91,8 @@ type Deps struct {
 	Authz authz.Authorizer
 	// HTTPClient makes the calls to Google; nil uses http.DefaultClient.
 	HTTPClient *http.Client
+	// Tracer starts spans; nil means none.
+	Tracer tracer.Tracer
 	// EmailCipher encrypts the address stored with a linked identity; nil
 	// stores none.
 	EmailCipher EmailEncrypter
@@ -171,7 +174,11 @@ func New(cfg *Config, deps *Deps) (*Module, error) {
 		tenancy: deps.Tenancy, tx: tx, v: v, users: deps.Users, tenants: deps.Tenants,
 		sessions: deps.Sessions, audit: deps.Audit, issue: issue, log: log,
 	}
-	m.serviceTokens = &ServiceTokens{cfg: &m.cfg, v: v, tokens: builder}
+	tr := deps.Tracer
+	if tr == nil {
+		tr = tracer.NewNoOp()
+	}
+	m.serviceTokens = &ServiceTokens{cfg: &m.cfg, v: v, tokens: builder, tr: tr}
 	m.google = &GoogleSignIns{
 		cfg: &m.cfg, tenancy: deps.Tenancy, provider: google.New(google.Config{
 			IssuerURL: cfg.Providers.Google.IssuerURL, ClientID: cfg.Providers.Google.ClientID,

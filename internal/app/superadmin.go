@@ -35,6 +35,7 @@ func newUserModule(
 		Audit:       userAudit{w: auditModule.Writer()},
 		Roles:       userRoles{svc: rbacModule.Service()},
 		Authz:       rbacModule.Authorizer(),
+		Tracer:      deps.Tracer,
 	})
 }
 
